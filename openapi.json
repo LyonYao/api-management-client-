@@ -1,0 +1,1585 @@
+﻿---
+openapi: 3.0.3
+info:
+  title: API Management System
+  description: Microservice API management and topology visualization system
+  contact:
+    name: API Management Team
+    email: api-management@company.com
+  license:
+    name: Proprietary
+    url: https://company.com/license
+  version: 1.0.0
+servers:
+- url: http://localhost:8080
+  description: Development Server
+- url: https://api.company.com
+  description: Production Server
+tags:
+- name: Systems
+  description: System management operations
+- name: APIs
+  description: API entity management operations
+- name: Endpoints
+  description: API endpoint management operations
+- name: Relationships
+  description: API call relationship management operations
+- name: Topology
+  description: API topology visualization operations
+- name: Health Check
+  description: API health check operations
+- name: OpenAPI
+  description: OpenAPI specification access
+paths:
+  /api/v1/apis:
+    get:
+      tags:
+      - APIs
+      summary: List APIs
+      description: Retrieves a list of APIs with optional tag filtering
+      parameters:
+      - name: tags
+        in: query
+        description: Filter by tags (comma-separated)
+        schema:
+          type: string
+      responses:
+        "200":
+          description: APIs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDTO'
+    post:
+      tags:
+      - APIs
+      summary: Create a new API
+      description: Creates a new API entity with metadata and tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiRequest'
+      responses:
+        "201":
+          description: API created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDTO'
+        "400":
+          description: Invalid request
+        "404":
+          description: System not found
+  /api/v1/apis/search:
+    get:
+      tags:
+      - APIs
+      summary: Search APIs by system
+      description: Retrieves all APIs belonging to a specific system
+      parameters:
+      - name: systemId
+        in: query
+        description: System ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: APIs retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDTO'
+        "400":
+          description: System ID is required
+  /api/v1/apis/{id}:
+    get:
+      tags:
+      - APIs
+      summary: Get API by ID
+      description: Retrieves detailed information about a specific API including its
+        endpoints
+      parameters:
+      - name: id
+        in: path
+        description: API ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: API found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDTO'
+        "404":
+          description: API not found
+    put:
+      tags:
+      - APIs
+      summary: Update API
+      description: Updates an existing API's information and tags
+      parameters:
+      - name: id
+        in: path
+        description: API ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApiRequest'
+      responses:
+        "200":
+          description: API updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDTO'
+        "404":
+          description: API not found
+        "400":
+          description: Invalid request
+    delete:
+      tags:
+      - APIs
+      summary: Delete API
+      description: Deletes an API and its associated endpoints
+      parameters:
+      - name: id
+        in: path
+        description: API ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "204":
+          description: API deleted successfully
+        "404":
+          description: API not found
+  /api/v1/endpoints:
+    get:
+      tags:
+      - Endpoints
+      summary: List all endpoints
+      description: Retrieves a list of all endpoints
+      responses:
+        "200":
+          description: Endpoints retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointDTO'
+    post:
+      tags:
+      - Endpoints
+      summary: Create a new endpoint
+      description: Creates a new endpoint for an API
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEndpointRequest'
+      responses:
+        "201":
+          description: Endpoint created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointDTO'
+        "400":
+          description: Invalid request
+        "404":
+          description: API not found
+        "409":
+          description: Endpoint with same path and method already exists
+  /api/v1/endpoints/api/{apiId}:
+    get:
+      tags:
+      - Endpoints
+      summary: Get endpoints by API
+      description: Retrieves all endpoints for a specific API
+      parameters:
+      - name: apiId
+        in: path
+        description: API ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: Endpoints retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointDTO'
+        "404":
+          description: API not found
+  /api/v1/endpoints/{id}:
+    get:
+      tags:
+      - Endpoints
+      summary: Get endpoint by ID
+      description: Retrieves detailed information about a specific endpoint
+      parameters:
+      - name: id
+        in: path
+        description: Endpoint ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: Endpoint found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointDTO'
+        "404":
+          description: Endpoint not found
+    put:
+      tags:
+      - Endpoints
+      summary: Update endpoint
+      description: Updates an existing endpoint's information
+      parameters:
+      - name: id
+        in: path
+        description: Endpoint ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEndpointRequest'
+      responses:
+        "200":
+          description: Endpoint updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EndpointDTO'
+        "404":
+          description: Endpoint not found
+        "400":
+          description: Invalid request
+    delete:
+      tags:
+      - Endpoints
+      summary: Delete endpoint
+      description: Deletes an endpoint
+      parameters:
+      - name: id
+        in: path
+        description: Endpoint ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "204":
+          description: Endpoint deleted successfully
+        "404":
+          description: Endpoint not found
+  /api/v1/health-check/batch:
+    post:
+      tags:
+      - Health Check
+      summary: Batch health check
+      description: Performs health checks on multiple endpoints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchHealthCheckRequest'
+      responses:
+        "200":
+          description: Health check completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchHealthCheckResponse'
+        "400":
+          description: Invalid request
+  /api/v1/health-check/history/{endpointId}:
+    get:
+      tags:
+      - Health Check
+      summary: Get health check history
+      description: Retrieves the health check history for an endpoint
+      parameters:
+      - name: endpointId
+        in: path
+        description: Endpoint ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HealthCheckResultDTO'
+        "404":
+          description: Endpoint not found
+  /api/v1/health-check/system/{systemId}:
+    post:
+      tags:
+      - Health Check
+      summary: System health check
+      description: Performs health checks on all endpoints of a system
+      parameters:
+      - name: systemId
+        in: path
+        description: System ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: Health check completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchHealthCheckResponse'
+        "404":
+          description: System not found
+  /api/v1/openapi.json:
+    get:
+      tags:
+      - OpenAPI
+      summary: Get OpenAPI specification
+      description: Retrieves the OpenAPI 3.0 specification document in JSON format
+      responses:
+        "307":
+          description: Redirect to OpenAPI specification
+        "200":
+          description: OpenAPI specification retrieved successfully
+  /api/v1/openapi.yaml:
+    get:
+      tags:
+      - OpenAPI
+      summary: Get OpenAPI specification in YAML
+      description: Retrieves the OpenAPI 3.0 specification document in YAML format
+      responses:
+        "307":
+          description: Redirect to OpenAPI specification
+        "200":
+          description: OpenAPI specification retrieved successfully
+  /api/v1/relationships:
+    get:
+      tags:
+      - Relationships
+      summary: List all relationships
+      description: Retrieves a list of all call relationships
+      responses:
+        "200":
+          description: Relationships retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipDTO'
+    post:
+      tags:
+      - Relationships
+      summary: Create a new relationship
+      description: Creates a new call relationship between systems or APIs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRelationshipRequest'
+      responses:
+        "201":
+          description: Relationship created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipDTO'
+        "400":
+          description: Invalid request
+        "404":
+          description: "Caller, callee, or endpoint not found"
+  /api/v1/relationships/{id}:
+    get:
+      tags:
+      - Relationships
+      summary: Get relationship by ID
+      description: Retrieves detailed information about a specific call relationship
+      parameters:
+      - name: id
+        in: path
+        description: Relationship ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "200":
+          description: Relationship found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipDTO'
+        "404":
+          description: Relationship not found
+    put:
+      tags:
+      - Relationships
+      summary: Update relationship
+      description: Updates an existing call relationship
+      parameters:
+      - name: id
+        in: path
+        description: Relationship ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRelationshipRequest'
+      responses:
+        "200":
+          description: Relationship updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelationshipDTO'
+        "404":
+          description: Relationship not found
+        "400":
+          description: Invalid request
+    delete:
+      tags:
+      - Relationships
+      summary: Delete relationship
+      description: Deletes a call relationship
+      parameters:
+      - name: id
+        in: path
+        description: Relationship ID
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+      responses:
+        "204":
+          description: Relationship deleted successfully
+        "404":
+          description: Relationship not found
+  /api/v1/swagger-ui{tail}:
+    get:
+      tags:
+      - OpenAPI
+      summary: Swagger UI redirect
+      description: Redirects any swagger-ui variant to the hosted Swagger UI
+      parameters:
+      - name: tail
+        in: path
+        required: true
+        schema:
+          pattern: .*
+          type: string
+      responses:
+        "307":
+          description: Redirect to Swagger UI
+  /api/v1/systems:
+    get:
+      tags:
+      - Systems
+      summary: List all systems
+      description: Retrieves a list of all systems registered in the platform
+      responses:
+        "200":
+          description: Systems retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SystemDTO'
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+      - Systems
+      summary: Create a new system
+      description: Creates a new system in the API management platform. System names
+        must be unique.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSystemRequest'
+      responses:
+        "201":
+          description: System created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemDTO'
+        "400":
+          description: Invalid request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: System with the same name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/systems/{id}:
+    get:
+      tags:
+      - Systems
+      summary: Get system by ID
+      description: Retrieves detailed information about a specific system including
+        its metadata
+      parameters:
+      - name: id
+        in: path
+        description: Unique identifier of the system
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+        example: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        "200":
+          description: System found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemDTO'
+        "404":
+          description: System not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+      - Systems
+      summary: Update system
+      description: Updates an existing system's information. Only provided fields
+        will be updated.
+      parameters:
+      - name: id
+        in: path
+        description: Unique identifier of the system
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+        example: 123e4567-e89b-12d3-a456-426614174000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemRequest'
+      responses:
+        "200":
+          description: System updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemDTO'
+        "400":
+          description: Invalid request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "404":
+          description: System not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+      - Systems
+      summary: Delete system
+      description: Deletes a system from the platform. This will cascade delete all
+        associated APIs and endpoints.
+      parameters:
+      - name: id
+        in: path
+        description: Unique identifier of the system
+        required: true
+        schema:
+          $ref: '#/components/schemas/UUID'
+        example: 123e4567-e89b-12d3-a456-426614174000
+      responses:
+        "204":
+          description: System deleted successfully
+        "404":
+          description: System not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "409":
+          description: System cannot be deleted due to existing dependencies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/topology:
+    get:
+      tags:
+      - Topology
+      summary: Get complete topology
+      description: "Retrieves the complete topology graph of all systems, APIs, and\
+        \ their relationships"
+      responses:
+        "200":
+          description: Topology retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyDTO'
+  /api/v1/topology/filter:
+    get:
+      tags:
+      - Topology
+      summary: Get filtered topology
+      description: Retrieves a filtered topology graph based on tags
+      parameters:
+      - name: tags
+        in: query
+        description: Filter by tags (comma-separated)
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Filtered topology retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyDTO'
+  /health:
+    get:
+      tags:
+      - Health Resource
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+components:
+  schemas:
+    ApiDTO:
+      description: API entity information with metadata and endpoints
+      required:
+      - name
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        systemId:
+          description: ID of the system this API belongs to
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        systemName:
+          description: Name of the system this API belongs to
+          type: string
+          example: User Service
+        name:
+          description: Name of the API
+          type: string
+          example: User Management API
+        description:
+          description: Description of the API
+          type: string
+          example: Provides endpoints for user CRUD operations
+        authType:
+          description: Authentication type required for this API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: JWT
+        specLink:
+          description: Link to the API specification document
+          type: string
+          example: https://docs.example.com/api/user-management
+        department:
+          description: Department responsible for this API
+          type: string
+          example: Engineering
+        contactName:
+          description: Name of the contact person
+          type: string
+          example: John Doe
+        contactEmails:
+          description: List of contact email addresses
+          type: array
+          items:
+            type: string
+          example:
+          - john.doe@example.com
+          - team@example.com
+        tags:
+          description: Tags associated with this API
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+          example:
+          - user
+          - authentication
+          - core
+        endpoints:
+          description: List of endpoints belonging to this API
+          type: array
+          items:
+            $ref: '#/components/schemas/EndpointDTO'
+        createdAt:
+          description: Timestamp when the API was created
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-15T10:30:00
+        updatedAt:
+          description: Timestamp when the API was last updated
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T14:45:00
+    AuthType:
+      enum:
+      - API_KEY
+      - OAUTH2
+      - BASIC_AUTH
+      - JWT
+      - NONE
+      type: string
+    BatchHealthCheckRequest:
+      description: Request to perform batch health checks on multiple endpoints
+      required:
+      - endpointIds
+      type: object
+      properties:
+        endpointIds:
+          description: List of endpoint IDs to check
+          minItems: 1
+          type: array
+          items:
+            format: uuid
+            pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+            type: string
+          example:
+          - 323e4567-e89b-12d3-a456-426614174002
+          - 423e4567-e89b-12d3-a456-426614174003
+    BatchHealthCheckResponse:
+      description: Response containing batch health check results
+      type: object
+      properties:
+        batchId:
+          description: Unique identifier for this batch check
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 523e4567-e89b-12d3-a456-426614174004
+        results:
+          description: List of health check results for each endpoint
+          type: array
+          items:
+            $ref: '#/components/schemas/HealthCheckResultDTO'
+        totalCount:
+          format: int32
+          description: Total number of endpoints checked
+          type: integer
+          example: 10
+        successCount:
+          format: int32
+          description: Number of successful checks
+          type: integer
+          example: 8
+        failureCount:
+          format: int32
+          description: Number of failed checks
+          type: integer
+          example: 2
+    CreateApiRequest:
+      description: Request to create a new API entity
+      required:
+      - systemId
+      - name
+      - contactEmails
+      type: object
+      properties:
+        systemId:
+          description: ID of the system this API belongs to
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        name:
+          description: Name of the API
+          maxLength: 255
+          pattern: \S
+          type: string
+          example: User Management API
+        description:
+          description: Description of the API
+          maxLength: 2000
+          type: string
+          example: Provides endpoints for user CRUD operations
+        authType:
+          description: Authentication type required for this API
+          enum:
+          - API_KEY
+          - OAUTH2
+          - BASIC_AUTH
+          - JWT
+          - NONE
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: JWT
+        specLink:
+          description: Link to the API specification document
+          maxLength: 1000
+          type: string
+          example: https://docs.example.com/api/user-management
+        department:
+          description: Department responsible for this API
+          maxLength: 255
+          type: string
+          example: Engineering
+        contactName:
+          description: Name of the contact person
+          maxLength: 255
+          type: string
+          example: John Doe
+        contactEmails:
+          description: List of contact email addresses (max 10)
+          type: array
+          items:
+            type: string
+          example:
+          - john.doe@example.com
+          - team@example.com
+        tags:
+          description: Tags to categorize this API
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+          example:
+          - user
+          - authentication
+          - core
+    CreateEndpointRequest:
+      description: Request to create a new API endpoint
+      required:
+      - apiId
+      - path
+      - httpMethod
+      type: object
+      properties:
+        apiId:
+          description: ID of the API this endpoint belongs to
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        path:
+          description: URL path of the endpoint
+          maxLength: 1000
+          pattern: \S
+          type: string
+          example: "/api/v1/users/{id}"
+        httpMethod:
+          description: HTTP method for this endpoint
+          enum:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - HEAD
+          - OPTIONS
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HttpMethod'
+          example: GET
+        description:
+          description: Description of what this endpoint does
+          maxLength: 2000
+          type: string
+          example: Retrieves a user by their unique identifier
+    CreateRelationshipRequest:
+      description: Request to create a new call relationship
+      required:
+      - callerType
+      - callerId
+      - calleeType
+      - calleeId
+      - endpointId
+      type: object
+      properties:
+        callerType:
+          description: Type of the caller entity (SYSTEM or API)
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: SYSTEM
+        callerId:
+          description: ID of the caller entity
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        calleeType:
+          description: Type of the callee entity (SYSTEM or API)
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: API
+        calleeId:
+          description: ID of the callee entity
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        endpointId:
+          description: ID of the specific endpoint being called
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 323e4567-e89b-12d3-a456-426614174002
+        authType:
+          description: Authentication type used for this call
+          enum:
+          - API_KEY
+          - OAUTH2
+          - BASIC_AUTH
+          - JWT
+          - NONE
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: JWT
+        authConfig:
+          description: Authentication configuration details
+          type: object
+          additionalProperties: {}
+          example:
+            header: Authorization
+            prefix: Bearer
+        description:
+          description: Description of this call relationship
+          maxLength: 2000
+          type: string
+          example: Order service calls user API to validate user permissions
+    CreateSystemRequest:
+      description: Request to create a new system
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          description: Name of the system
+          maxLength: 255
+          pattern: \S
+          type: string
+          example: User Service
+        description:
+          description: Description of the system
+          maxLength: 2000
+          type: string
+          example: Handles user authentication and profile management
+    EdgeDTO:
+      description: Edge in the topology graph representing a call relationship
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the relationship
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 423e4567-e89b-12d3-a456-426614174003
+        sourceId:
+          description: ID of the source node (caller)
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        targetId:
+          description: ID of the target node (callee)
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        authType:
+          description: Authentication type used for this call
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: JWT
+        metadata:
+          description: Additional metadata about the relationship
+          type: object
+          additionalProperties: {}
+          example:
+            endpointPath: "/api/v1/users/{id}"
+            method: GET
+    EndpointDTO:
+      description: API endpoint information
+      required:
+      - path
+      - httpMethod
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the endpoint
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 323e4567-e89b-12d3-a456-426614174002
+        apiId:
+          description: ID of the API this endpoint belongs to
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        path:
+          description: URL path of the endpoint
+          type: string
+          example: "/api/v1/users/{id}"
+        httpMethod:
+          description: HTTP method for this endpoint
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HttpMethod'
+          example: GET
+        description:
+          description: Description of what this endpoint does
+          type: string
+          example: Retrieves a user by their unique identifier
+        createdAt:
+          description: Timestamp when the endpoint was created
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-15T10:30:00
+        updatedAt:
+          description: Timestamp when the endpoint was last updated
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T14:45:00
+    EntityType:
+      enum:
+      - SYSTEM
+      - API
+      type: string
+    ErrorResponse:
+      description: Error response returned when an API request fails
+      type: object
+      properties:
+        error:
+          description: Error type or code
+          type: string
+          example: ResourceNotFoundException
+        message:
+          description: Human-readable error message
+          type: string
+          example: System with ID 123e4567-e89b-12d3-a456-426614174000 not found
+        path:
+          description: Request path that caused the error
+          type: string
+          example: /api/v1/systems/123e4567-e89b-12d3-a456-426614174000
+        timestamp:
+          description: Timestamp when the error occurred
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T15:30:00
+        details:
+          description: Additional error details
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            field: name
+            issue: must not be blank
+    HealthCheckResultDTO:
+      description: Health check result for an API endpoint
+      type: object
+      properties:
+        endpointId:
+          description: ID of the endpoint that was checked
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 323e4567-e89b-12d3-a456-426614174002
+        endpointPath:
+          description: Path of the endpoint
+          type: string
+          example: "/api/v1/users/{id}"
+        httpMethod:
+          description: HTTP method of the endpoint
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HttpMethod'
+          example: GET
+        status:
+          description: Status of the health check
+          enum:
+          - SUCCESS
+          - FAILURE
+          - TIMEOUT
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HealthCheckStatus'
+          example: SUCCESS
+        responseCode:
+          format: int32
+          description: HTTP response code received
+          type: integer
+          example: 200
+        responseTimeMs:
+          format: int32
+          description: Response time in milliseconds
+          type: integer
+          example: 145
+        errorMessage:
+          description: Error message if the check failed
+          type: string
+          example: Connection timeout
+        checkedAt:
+          description: Timestamp when the check was performed
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T15:30:00
+    HealthCheckStatus:
+      enum:
+      - SUCCESS
+      - FAILURE
+      - TIMEOUT
+      type: string
+    HttpMethod:
+      enum:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - HEAD
+      - OPTIONS
+      type: string
+    LocalDateTime:
+      format: date-time
+      type: string
+      example: 2022-03-10T12:15:50
+    NodeDTO:
+      description: Node in the topology graph representing a system or API
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the node
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        name:
+          description: Name of the node
+          type: string
+          example: User Service
+        type:
+          description: Type of the node
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: SYSTEM
+        metadata:
+          description: Additional metadata about the node
+          type: object
+          additionalProperties: {}
+          example:
+            department: Engineering
+            tags:
+            - core
+            - user
+    RelationshipDTO:
+      description: API call relationship information between systems or APIs
+      required:
+      - callerType
+      - callerId
+      - calleeType
+      - calleeId
+      - endpointId
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the relationship
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 423e4567-e89b-12d3-a456-426614174003
+        callerType:
+          description: Type of the caller entity
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: SYSTEM
+        callerId:
+          description: ID of the caller entity
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        callerName:
+          description: Name of the caller entity
+          type: string
+          example: Order Service
+        calleeType:
+          description: Type of the callee entity
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: API
+        calleeId:
+          description: ID of the callee entity
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        calleeName:
+          description: Name of the callee entity
+          type: string
+          example: User Management API
+        endpointId:
+          description: ID of the specific endpoint being called
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 323e4567-e89b-12d3-a456-426614174002
+        endpointPath:
+          description: Path of the endpoint being called
+          type: string
+          example: "/api/v1/users/{id}"
+        endpointMethod:
+          description: HTTP method of the endpoint being called
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HttpMethod'
+          example: GET
+        authType:
+          description: Authentication type used for this call
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: JWT
+        authConfig:
+          description: Authentication configuration details
+          type: object
+          additionalProperties: {}
+          example:
+            header: Authorization
+            prefix: Bearer
+        description:
+          description: Description of this call relationship
+          type: string
+          example: Order service calls user API to validate user permissions
+        createdAt:
+          description: Timestamp when the relationship was created
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-15T10:30:00
+        updatedAt:
+          description: Timestamp when the relationship was last updated
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T14:45:00
+    SystemDTO:
+      description: System information
+      required:
+      - name
+      type: object
+      properties:
+        id:
+          description: Unique identifier of the system
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        name:
+          description: Name of the system
+          type: string
+          example: User Service
+        description:
+          description: Description of the system
+          type: string
+          example: Handles user authentication and profile management
+        createdAt:
+          description: Timestamp when the system was created
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-15T10:30:00
+        updatedAt:
+          description: Timestamp when the system was last updated
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/LocalDateTime'
+          example: 2024-01-20T14:45:00
+    TopologyDTO:
+      description: "Topology graph data representing systems, APIs, and their relationships"
+      type: object
+      properties:
+        nodes:
+          description: List of nodes in the topology graph (systems and APIs)
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeDTO'
+        edges:
+          description: List of edges in the topology graph (call relationships)
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeDTO'
+    UUID:
+      format: uuid
+      pattern: "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+      type: string
+    UpdateApiRequest:
+      description: Request to update an existing API entity
+      type: object
+      properties:
+        name:
+          description: Updated name of the API
+          maxLength: 255
+          type: string
+          example: User Management API v2
+        description:
+          description: Updated description of the API
+          maxLength: 2000
+          type: string
+          example: Enhanced user CRUD operations with role-based access
+        authType:
+          description: Updated authentication type
+          enum:
+          - API_KEY
+          - OAUTH2
+          - BASIC_AUTH
+          - JWT
+          - NONE
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: OAUTH2
+        specLink:
+          description: Updated link to the API specification
+          maxLength: 1000
+          type: string
+          example: https://docs.example.com/api/user-management/v2
+        department:
+          description: Updated department
+          maxLength: 255
+          type: string
+          example: Platform Engineering
+        contactName:
+          description: Updated contact person name
+          maxLength: 255
+          type: string
+          example: Jane Smith
+        contactEmails:
+          description: Updated list of contact emails (max 10)
+          type: array
+          items:
+            type: string
+          example:
+          - jane.smith@example.com
+          - platform-team@example.com
+        tags:
+          description: Updated tags
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+          example:
+          - user
+          - oauth2
+          - core
+          - v2
+    UpdateEndpointRequest:
+      description: Request to update an existing endpoint
+      type: object
+      properties:
+        path:
+          description: Updated URL path of the endpoint
+          maxLength: 1000
+          type: string
+          example: "/api/v2/users/{id}"
+        httpMethod:
+          description: Updated HTTP method
+          enum:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - HEAD
+          - OPTIONS
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/HttpMethod'
+          example: POST
+        description:
+          description: Updated description
+          maxLength: 2000
+          type: string
+          example: Creates or updates a user by their unique identifier
+    UpdateRelationshipRequest:
+      description: Request to update an existing call relationship
+      type: object
+      properties:
+        callerType:
+          description: Updated caller type
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: API
+        callerId:
+          description: Updated caller ID
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 223e4567-e89b-12d3-a456-426614174001
+        calleeType:
+          description: Updated callee type
+          enum:
+          - SYSTEM
+          - API
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/EntityType'
+          example: SYSTEM
+        calleeId:
+          description: Updated callee ID
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 123e4567-e89b-12d3-a456-426614174000
+        endpointId:
+          description: Updated endpoint ID
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/UUID'
+          example: 323e4567-e89b-12d3-a456-426614174002
+        authType:
+          description: Updated authentication type
+          enum:
+          - API_KEY
+          - OAUTH2
+          - BASIC_AUTH
+          - JWT
+          - NONE
+          type: string
+          allOf:
+          - $ref: '#/components/schemas/AuthType'
+          example: OAUTH2
+        authConfig:
+          description: Updated authentication configuration
+          type: object
+          additionalProperties: {}
+          example:
+            clientId: abc123
+            scope: read:users
+        description:
+          description: Updated description
+          maxLength: 2000
+          type: string
+          example: Order service calls user API with OAuth2 for enhanced security
+    UpdateSystemRequest:
+      description: Request to update an existing system
+      type: object
+      properties:
+        name:
+          description: Updated name of the system
+          maxLength: 255
+          type: string
+          example: User Service v2
+        description:
+          description: Updated description of the system
+          maxLength: 2000
+          type: string
+          example: Enhanced user authentication and profile management with OAuth2
+            support
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: "JWT Bearer token authentication. Include the token in the Authorization\
+        \ header as: Bearer <token>"
+      scheme: bearer
+      bearerFormat: JWT
+
