@@ -18,20 +18,44 @@ export default function App(){
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={240} style={{ background:'#0f1724', paddingTop:18 }}>
-        <div style={{ color:'#fff', fontSize:18, fontWeight:700, padding:'0 20px 16px 20px' }}>API Manager</div>
-        <Menu theme="dark" mode="inline" selectedKeys={[selected]} style={{ background:'transparent', border:'none' }}>
-          <Menu.Item key="/systems" icon={<AppstoreOutlined />}><Link to="/systems">Systems</Link></Menu.Item>
-          <Menu.Item key="/apis" icon={<ApiOutlined />}><Link to="/apis">APIs</Link></Menu.Item>
-          <Menu.Item key="/endpoints" icon={<LinkOutlined />}><Link to="/endpoints">Endpoints</Link></Menu.Item>
-          <Menu.Item key="/relationships" icon={<ClusterOutlined />}><Link to="/relationships">Relationships</Link></Menu.Item>
-          <Menu.Item key="/topology" icon={<AimOutlined />}><Link to="/topology">Topology</Link></Menu.Item>
-          <Menu.Item key="/health-check" icon={<HeartOutlined />}><Link to="/health-check">Health Check</Link></Menu.Item>
-          <Menu.Item key="/openapi" icon={<FileTextOutlined />}><Link to="/openapi">OpenAPI</Link></Menu.Item>
+      <Sider width={240} className="sidebar" style={{ paddingTop: 0, overflow: 'auto' }}>
+        <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, padding: '24px 20px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>API Manager</div>
+        <Menu 
+          theme="dark" 
+          mode="inline" 
+          selectedKeys={[selected]} 
+          style={{ 
+            background: 'transparent', 
+            border: 'none',
+            padding: '16px 0'
+          }}
+          className="sidebar-menu"
+        >
+          <Menu.Item key="/systems" icon={<AppstoreOutlined style={{ color: selected === '/systems' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/systems" className={selected === '/systems' ? 'sidebar-link active' : 'sidebar-link'}>Systems</Link>
+          </Menu.Item>
+          <Menu.Item key="/apis" icon={<ApiOutlined style={{ color: selected === '/apis' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/apis" className={selected === '/apis' ? 'sidebar-link active' : 'sidebar-link'}>APIs</Link>
+          </Menu.Item>
+          <Menu.Item key="/endpoints" icon={<LinkOutlined style={{ color: selected === '/endpoints' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/endpoints" className={selected === '/endpoints' ? 'sidebar-link active' : 'sidebar-link'}>Endpoints</Link>
+          </Menu.Item>
+          <Menu.Item key="/relationships" icon={<ClusterOutlined style={{ color: selected === '/relationships' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/relationships" className={selected === '/relationships' ? 'sidebar-link active' : 'sidebar-link'}>Relationships</Link>
+          </Menu.Item>
+          <Menu.Item key="/topology" icon={<AimOutlined style={{ color: selected === '/topology' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/topology" className={selected === '/topology' ? 'sidebar-link active' : 'sidebar-link'}>Topology</Link>
+          </Menu.Item>
+          <Menu.Item key="/health-check" icon={<HeartOutlined style={{ color: selected === '/health-check' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/health-check" className={selected === '/health-check' ? 'sidebar-link active' : 'sidebar-link'}>Health Check</Link>
+          </Menu.Item>
+          <Menu.Item key="/openapi" icon={<FileTextOutlined style={{ color: selected === '/openapi' ? '#fff' : '#93c5fd' }} />}>
+            <Link to="/openapi" className={selected === '/openapi' ? 'sidebar-link active' : 'sidebar-link'}>OpenAPI</Link>
+          </Menu.Item>
         </Menu>
       </Sider>
       <Layout>
-        <Content style={{ padding:24, background:'#f3f4f6' }}>
+        <Content className="main">
           <Routes>
             <Route path="/systems" element={<Systems />} />
             <Route path="/apis" element={<Apis />} />

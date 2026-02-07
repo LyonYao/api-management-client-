@@ -6,8 +6,31 @@ const API = axios.create({
   timeout: 15000
 })
 
+// 将下划线分隔的字段名转换为驼峰命名
+function snakeToCamel(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(item => snakeToCamel(item))
+  } else if (obj && typeof obj === 'object') {
+    const converted = {}
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+        converted[camelKey] = snakeToCamel(obj[key])
+      }
+    }
+    return converted
+  }
+  return obj
+}
+
 API.interceptors.response.use(
-  res => res,
+  res => {
+    // 转换响应数据中的字段名为驼峰命名
+    if (res.data) {
+      res.data = snakeToCamel(res.data)
+    }
+    return res
+  },
   err => {
     if (err.response) {
       const e = new Error(err.response.statusText || 'API Error')
@@ -21,6 +44,7 @@ API.interceptors.response.use(
 
 export function getErrorMessage(err) {
   if (!err) return 'Unknown error'
+  if (err.body && err.body.detail) return err.body.detail
   if (err.body && err.body.message) return err.body.message
   if (err.message) return err.message
   try { return JSON.stringify(err.body || err) } catch { return String(err) }

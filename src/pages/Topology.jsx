@@ -13,6 +13,11 @@ export default function Topology() {
   const [topologyData, setTopologyData] = useState({ systems: [], connections: [] })
   const [dragging, setDragging] = useState(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [panning, setPanning] = useState(false)
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [zoomCenter, setZoomCenter] = useState({ x: 0, y: 0 })
   const svgRef = useRef(null)
 
   // 获取基础数据
@@ -574,6 +579,54 @@ export default function Topology() {
     setDragOffset({ x: 0, y: 0 })
   }
 
+  // 处理画布平移开始
+  const handlePanStart = (e) => {
+    e.preventDefault()
+    setPanning(true)
+    setPanStart({ x: e.clientX, y: e.clientY })
+  }
+
+  // 处理画布平移中
+  const handlePanMove = (e) => {
+    if (!panning) return
+    
+    e.preventDefault()
+    const deltaX = e.clientX - panStart.x
+    const deltaY = e.clientY - panStart.y
+    
+    setPanOffset(prev => ({
+      x: prev.x + deltaX,
+      y: prev.y + deltaY
+    }))
+    
+    setPanStart({ x: e.clientX, y: e.clientY })
+  }
+
+  // 处理画布平移结束
+  const handlePanEnd = () => {
+    setPanning(false)
+  }
+
+  // 处理鼠标滚轮事件，实现放大和缩小
+  const handleWheel = (e) => {
+    e.preventDefault()
+    
+    // 计算缩放因子
+    const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
+    const newZoom = Math.max(0.1, Math.min(3, zoom * scaleFactor))
+    
+    // 计算鼠标在SVG中的位置
+    const rect = svgRef.current.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+    
+    // 计算新的缩放中心
+    setZoomCenter({ x: mouseX, y: mouseY })
+    
+    // 更新缩放级别
+    setZoom(newZoom)
+  }
+
   // 获取元素的绝对位置
   const getElementPosition = (id, type) => {
     // 查找系统
@@ -805,134 +858,165 @@ export default function Topology() {
             ref={svgRef}
             width="100%"
             height="100%"
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-            style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+            style={{ overflow: 'hidden' }}
+            onWheel={handleWheel}
           >
-            {/* 绘制系统 */}
-            {topologyData.systems.map(system => (
-              <g key={system.id}>
-                {/* 系统容器 - 简洁圆角矩形 */}
-                <rect
-                  x={system.x}
-                  y={system.y}
-                  width={system.width}
-                  height={system.height}
-                  fill="rgba(24, 144, 255, 0.15)"
-                  stroke="#1890ff"
-                  strokeWidth="1.5"
-                  rx="6"
-                  onMouseDown={(e) => handleDragStart(e, 'system', system.id, system.x, system.y)}
-                />
-                
-                {/* 系统标题 */}
-                <text
-                  x={system.x + 15}
-                  y={system.y + 28}
-                  fontSize="12"
-                  fontWeight="bold"
-                  fill="#1890ff"
-                >
-                  🏢 {system.name}
-                </text>
-                
-                {/* 系统描述 */}
-                {system.description && (
-                  <text
-                    x={system.x + 15}
-                    y={system.y + 45}
-                    fontSize="9"
-                    fill="#666"
-                  >
-                    {system.description}
-                  </text>
-                )}
-                
-                {/* API数量 */}
-                <text
-                  x={system.x + system.width - 15}
-                  y={system.y + 28}
-                  fontSize="10"
-                  fill="#666"
-                  textAnchor="end"
-                >
-                  API: {system.apis.length}
-                </text>
-
-                {/* 绘制API */}
-                {system.apis.map(api => (
-                  <g key={api.id}>
-                    {/* API容器 - 简洁矩形 */}
+            {/* 更大的背景区域，用于平移 */}
+            <g>
+              {/* 背景矩形，用于拖动 */}
+              <rect
+                width="2000"
+                height="2000"
+                fill="#fafafa"
+                onMouseDown={handlePanStart}
+                onMouseMove={handlePanMove}
+                onMouseUp={handlePanEnd}
+                onMouseLeave={handlePanEnd}
+                style={{ cursor: panning ? 'grabbing' : 'grab' }}
+              />
+              
+              {/* 可平移和缩放的内容组 */}
+              <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
+                {/* 绘制系统 */}
+                {topologyData.systems.map(system => (
+                  <g key={system.id}>
+                    {/* 系统容器 - 简洁圆角矩形 */}
                     <rect
-                      x={system.x + api.x}
-                      y={system.y + api.y}
-                      width={api.width}
-                      height={api.height}
-                      fill="rgba(82, 196, 26, 0.15)"
-                      stroke="#52c41a"
-                      strokeWidth="1"
-                      rx="4"
+                      x={system.x}
+                      y={system.y}
+                      width={system.width}
+                      height={system.height}
+                      fill="rgba(24, 144, 255, 0.15)"
+                      stroke="#1890ff"
+                      strokeWidth="1.5"
+                      rx="6"
+                      onMouseDown={(e) => {
+                        e.stopPropagation()
+                        handleDragStart(e, 'system', system.id, system.x, system.y)
+                      }}
+                      onMouseMove={(e) => {
+                        e.stopPropagation()
+                        handleDragMove(e)
+                      }}
+                      onMouseUp={(e) => {
+                        e.stopPropagation()
+                        handleDragEnd()
+                      }}
+                      onMouseLeave={(e) => {
+                        e.stopPropagation()
+                        handleDragEnd()
+                      }}
                     />
                     
-                    {/* API标题 */}
+                    {/* 系统标题 */}
                     <text
-                      x={system.x + api.x + 12}
-                      y={system.y + api.y + 20}
-                      fontSize="10"
+                      x={system.x + 15}
+                      y={system.y + 28}
+                      fontSize="12"
                       fontWeight="bold"
-                      fill="#52c41a"
+                      fill="#1890ff"
                     >
-                      ⚡ {api.name}
+                      🏢 {system.name}
                     </text>
                     
-                    {/* 端点数量 */}
+                    {/* 系统描述 */}
+                    {system.description && (
+                      <text
+                        x={system.x + 15}
+                        y={system.y + 45}
+                        fontSize="9"
+                        fill="#666"
+                      >
+                        {system.description}
+                      </text>
+                    )}
+                    
+                    {/* API数量 */}
                     <text
-                      x={system.x + api.x + api.width - 12}
-                      y={system.y + api.y + 20}
-                      fontSize="9"
+                      x={system.x + system.width - 15}
+                      y={system.y + 28}
+                      fontSize="10"
                       fill="#666"
                       textAnchor="end"
                     >
-                      端点: {api.endpoints.length}
+                      API: {system.apis.length}
                     </text>
 
-                    {/* 绘制端点 */}
-                    {api.endpoints.map(endpoint => (
-                      <g key={endpoint.id}>
-                        {/* 端点容器 - 改为圆形 */}
-                        <circle
-                          cx={system.x + api.x + endpoint.x + endpoint.width / 2}
-                          cy={system.y + api.y + endpoint.y + endpoint.height / 2}
-                          r={endpoint.width / 2}
-                          fill="#f5f5f5"
-                          stroke="#d9d9d9"
+                    {/* 绘制API */}
+                    {system.apis.map(api => (
+                      <g key={api.id}>
+                        {/* API容器 - 简洁矩形 */}
+                        <rect
+                          x={system.x + api.x}
+                          y={system.y + api.y}
+                          width={api.width}
+                          height={api.height}
+                          fill="rgba(82, 196, 26, 0.15)"
+                          stroke="#52c41a"
                           strokeWidth="1"
+                          rx="4"
                         />
-                        {/* SVG Title元素 - 鼠标悬停时显示路径 */}
-                        <title>{endpoint.path}</title>
                         
-                        {/* HTTP方法 */}
+                        {/* API标题 */}
                         <text
-                          x={system.x + api.x + endpoint.x + endpoint.width / 2}
-                          y={system.y + api.y + endpoint.y + endpoint.height / 2 + 3}
-                          fontSize="9"
+                          x={system.x + api.x + 12}
+                          y={system.y + api.y + 20}
+                          fontSize="10"
                           fontWeight="bold"
-                          fill="#fa8c16"
-                          textAnchor="middle"
-                          dominantBaseline="middle"
+                          fill="#52c41a"
                         >
-                          {endpoint.method}
+                          ⚡ {api.name}
                         </text>
+                        
+                        {/* 端点数量 */}
+                        <text
+                          x={system.x + api.x + api.width - 12}
+                          y={system.y + api.y + 20}
+                          fontSize="9"
+                          fill="#666"
+                          textAnchor="end"
+                        >
+                          端点: {api.endpoints.length}
+                        </text>
+
+                        {/* 绘制端点 */}
+                        {api.endpoints.map(endpoint => (
+                          <g key={endpoint.id}>
+                            {/* 端点容器 - 改为圆形 */}
+                            <circle
+                              cx={system.x + api.x + endpoint.x + endpoint.width / 2}
+                              cy={system.y + api.y + endpoint.y + endpoint.height / 2}
+                              r={endpoint.width / 2}
+                              fill="#f5f5f5"
+                              stroke="#d9d9d9"
+                              strokeWidth="1"
+                            />
+                            {/* SVG Title元素 - 鼠标悬停时显示路径 */}
+                            <title>{endpoint.path}</title>
+                            
+                            {/* HTTP方法 */}
+                            <text
+                              x={system.x + api.x + endpoint.x + endpoint.width / 2}
+                              y={system.y + api.y + endpoint.y + endpoint.height / 2 + 3}
+                              fontSize="9"
+                              fontWeight="bold"
+                              fill="#fa8c16"
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                            >
+                              {endpoint.method}
+                            </text>
+                          </g>
+                        ))}
                       </g>
                     ))}
                   </g>
                 ))}
+                
+                {/* 绘制连接线 - 放在最后，确保在最上层 */}
+                {drawConnections()}
               </g>
-            ))}
-            
-            {/* 绘制连接线 - 放在最后，确保在最上层 */}
-            {drawConnections()}
+            </g>
           </svg>
         )}
       </Card>
