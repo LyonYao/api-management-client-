@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Button, Space, message, Avatar, Dropdown } from 'antd'
-import { AppstoreOutlined, ApiOutlined, LinkOutlined, ClusterOutlined, AimOutlined, HeartOutlined, FileTextOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, ApiOutlined, LinkOutlined, ClusterOutlined, AimOutlined, HeartOutlined, FileTextOutlined, LogoutOutlined, UserOutlined, AuditOutlined } from '@ant-design/icons'
 import Systems from './pages/Systems'
 import Apis from './pages/Apis'
 import Endpoints from './pages/Endpoints'
 import Relationships from './pages/Relationships'
 import Topology from './pages/Topology'
 import HealthCheck from './pages/HealthCheck'
+import AuditLog from './pages/AuditLog'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import API, { getErrorMessage } from './api'
@@ -94,9 +95,9 @@ export default function App(){
   }
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       {user ? (
-        <Sider width={240} className="sidebar" style={{ paddingTop: 0, overflow: 'auto' }}>
+        <Sider width={240} className="sidebar" style={{ paddingTop: 0 }}>
           <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, padding: '24px 20px 16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>API Manager</div>
           <Menu 
             theme="dark" 
@@ -127,6 +128,9 @@ export default function App(){
             <Menu.Item key="/health-check" icon={<HeartOutlined style={{ color: selected === '/health-check' ? '#fff' : '#93c5fd' }} />}>
               <Link to="/health-check" className={selected === '/health-check' ? 'sidebar-link active' : 'sidebar-link'}>Health Check</Link>
             </Menu.Item>
+            <Menu.Item key="/audit" icon={<AuditOutlined style={{ color: selected === '/audit' ? '#fff' : '#93c5fd' }} />}>
+              <Link to="/audit" className={selected === '/audit' ? 'sidebar-link active' : 'sidebar-link'}>Audit Logs</Link>
+            </Menu.Item>
           </Menu>
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             <Dropdown overlay={userMenu} placement="topRight">
@@ -144,8 +148,8 @@ export default function App(){
           </Link>
         </div>
       )}
-      <Layout>
-        <Content className="main" style={{ margin: user ? 0 : '20px' }}>
+      <Layout style={{ flex: 1, overflow: 'hidden' }}>
+        <Content className="main" style={{ margin: user ? 0 : '20px', height: '100%' }}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/systems" element={<ProtectedRoute><Systems /></ProtectedRoute>} />
@@ -154,6 +158,7 @@ export default function App(){
             <Route path="/relationships" element={<ProtectedRoute><Relationships /></ProtectedRoute>} />
             <Route path="/topology" element={<ProtectedRoute><Topology /></ProtectedRoute>} />
             <Route path="/health-check" element={<ProtectedRoute><HealthCheck /></ProtectedRoute>} />
+            <Route path="/audit" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><Systems /></ProtectedRoute>} />
           </Routes>

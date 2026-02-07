@@ -31,16 +31,19 @@ body{
   background-color:var(--bg-tertiary);
 }
 
-.app{ display:flex; height:100vh }
+.app{ display:flex; height:100vh; overflow:hidden }
 
 .sidebar{ 
   width:var(--sidebar-width); 
   background:linear-gradient(180deg, #26a69a 0%, #00897b 100%);
   color:#fff; 
-  padding:20px; 
+  padding:20px;
   box-sizing:border-box;
   box-shadow:var(--shadow-md);
   z-index:10;
+  height:100vh;
+  overflow-y:auto;
+  position:relative;
 }
 
 .sidebar h2{ 
@@ -129,6 +132,7 @@ body{
   background-image:
     radial-gradient(circle at 1px 1px, rgba(0,0,0,0.03) 1px, transparent 0);
   background-size:20px 20px;
+  max-height: calc(100vh - 48px);
 }
 
 /* Card Styles */
