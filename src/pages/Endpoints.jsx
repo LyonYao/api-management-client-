@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Row, Col, Tooltip } from 'antd'
+import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Row, Col, Tooltip, DatePicker } from 'antd'
+import Button from '../components/Button'
 import API, { getErrorMessage } from '../api'
 
 const { Option } = Select
@@ -80,7 +81,14 @@ export default function Endpoints(){
         apiId: values.apiId,
         path: values.path.trim(),
         httpMethod: values.httpMethod,
-        description: values.description
+        description: values.description,
+        status: values.status || 'DEVELOPING',
+        onlineDate: values.onlineDate,
+        devHost: values.devHost,
+        uatHost: values.uatHost,
+        prodHost: values.prodHost,
+        healthCheckPath: values.healthCheckPath,
+        healthCheckRule: values.healthCheckRule
       }
       await API.post('/api/v1/endpoints', payload)
       message.success('Endpoint created')
@@ -126,14 +134,38 @@ export default function Endpoints(){
       // populate editApis for that system and then set fields
       await onSystemChangeForEdit(systemId)
     }
-    editForm.setFieldsValue({ systemId: systemId, apiId: record.apiId, path: record.path, httpMethod: record.httpMethod, description: record.description })
+    editForm.setFieldsValue({
+      systemId: systemId, 
+      apiId: record.apiId, 
+      path: record.path, 
+      httpMethod: record.httpMethod, 
+      description: record.description,
+      status: record.status || 'DEVELOPING',
+      onlineDate: record.onlineDate,
+      devHost: record.devHost,
+      uatHost: record.uatHost,
+      prodHost: record.prodHost,
+      healthCheckPath: record.healthCheckPath,
+      healthCheckRule: record.healthCheckRule
+    })
     setEditVisible(true)
   }
 
   async function onEdit(){
     try{
       const values = await editForm.validateFields()
-      const payload = { path: values.path.trim(), httpMethod: values.httpMethod, description: values.description }
+      const payload = {
+        path: values.path.trim(),
+        httpMethod: values.httpMethod,
+        description: values.description,
+        status: values.status,
+        onlineDate: values.onlineDate,
+        devHost: values.devHost,
+        uatHost: values.uatHost,
+        prodHost: values.prodHost,
+        healthCheckPath: values.healthCheckPath,
+        healthCheckRule: values.healthCheckRule
+      }
       await API.put(`/api/v1/endpoints/${editing.id}`, payload)
       message.success('Updated')
       setEditVisible(false)
@@ -164,7 +196,7 @@ export default function Endpoints(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  function copyId(id){ navigator.clipboard.writeText(id).then(()=>message.success('ID copied')) }
+
 
   const { items, total } = paged()
 
@@ -190,6 +222,7 @@ export default function Endpoints(){
     { title: 'API', dataIndex: 'apiId', key: 'apiId', render: v => (mapApi(v)?.name || v), width: 240 },
     { title: 'Method', dataIndex: 'httpMethod', key: 'httpMethod', width: 100 },
     { title: 'Endpoint', dataIndex: 'path', key: 'path', width: 320, render: v => v },
+    { title: 'Status', dataIndex: 'status', key: 'status', width: 120, render: v => v ? v : '-' },
     { title: 'Description', dataIndex: 'description', key: 'description', width: 360, render: v => (
       v ? (
         <Tooltip title={v} mouseLeaveDelay={0}>
@@ -200,7 +233,6 @@ export default function Endpoints(){
     { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 320, onCell: ()=>({ className:'col-actions' }), onHeaderCell: ()=>({ className:'col-actions' }), render: (_, record)=>(
         <Space>
-          <Button type="primary" size="small" onClick={()=>copyId(record.id)}>Copy</Button>
           <Button type="primary" size="small" onClick={()=>showDetail(record)}>Details</Button>
           <Button type="primary" size="small" onClick={()=>openEdit(record)}>Edit</Button>
           <Popconfirm title="Delete this endpoint?" onConfirm={()=>onDelete(record.id)}>
@@ -236,7 +268,7 @@ export default function Endpoints(){
       </div>
 
       <Modal title="Create Endpoint" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={760}>
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ httpMethod: 'GET' }}>
+        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ httpMethod: 'GET', status: 'DEVELOPING' }}>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="systemId" label="System" >
@@ -272,6 +304,57 @@ export default function Endpoints(){
               </Form.Item>
             </Col>
           </Row>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="status" label="Status">
+                <Select>
+                  <Option value="DEVELOPING">DEVELOPING</Option>
+                  <Option value="TESTING">TESTING</Option>
+                  <Option value="ONLINE">ONLINE</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="onlineDate" label="Online Date">
+                <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="devHost" label="Dev Host">
+                <Input placeholder="Development host" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="uatHost" label="UAT Host">
+                <Input placeholder="Testing host" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="prodHost" label="Prod Host">
+                <Input placeholder="Production host" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="healthCheckPath" label="Health Check Path">
+                <Input placeholder="/health" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="healthCheckRule" label="Health Check Rule">
+            <Input.TextArea rows={3} placeholder="Health check rule JSON" />
+          </Form.Item>
 
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
@@ -324,6 +407,57 @@ export default function Endpoints(){
             </Col>
           </Row>
 
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="status" label="Status">
+                <Select>
+                  <Option value="DEVELOPING">DEVELOPING</Option>
+                  <Option value="TESTING">TESTING</Option>
+                  <Option value="ONLINE">ONLINE</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="onlineDate" label="Online Date">
+                <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="devHost" label="Dev Host">
+                <Input placeholder="Development host" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="uatHost" label="UAT Host">
+                <Input placeholder="Testing host" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="prodHost" label="Prod Host">
+                <Input placeholder="Production host" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={24}>
+              <Form.Item name="healthCheckPath" label="Health Check Path">
+                <Input placeholder="/health" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="healthCheckRule" label="Health Check Rule">
+            <Input.TextArea rows={3} placeholder="Health check rule JSON" />
+          </Form.Item>
+
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
           </Form.Item>
@@ -341,15 +475,19 @@ export default function Endpoints(){
         {detail && (
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="ID">
-              <Space>
-                <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
-                <Button type="link" onClick={()=>copyId(detail.id)}>Copy</Button>
-              </Space>
+              <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Path">{detail.path}</Descriptions.Item>
             <Descriptions.Item label="HTTP Method">{detail.httpMethod}</Descriptions.Item>
             <Descriptions.Item label="API">{detail.apiName || mapApi(detail.apiId)?.name || detail.apiId}</Descriptions.Item>
             <Descriptions.Item label="System">{detail.apiSystemName || mapApi(detail.apiId)?.systemName || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Status">{detail.status || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Online Date">{detail.onlineDate ? new Date(detail.onlineDate).toLocaleString() : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Dev Host">{detail.devHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="UAT Host">{detail.uatHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Prod Host">{detail.prodHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Path">{detail.healthCheckPath || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Rule">{detail.healthCheckRule ? JSON.stringify(detail.healthCheckRule) : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Created">{detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}</Descriptions.Item>
             <Descriptions.Item label="Updated">{detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}</Descriptions.Item>

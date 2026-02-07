@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Tag, Row, Col } from 'antd'
+import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Tag, Row, Col } from 'antd'
+import Button from '../components/Button'
 import API, { getErrorMessage } from '../api'
 
 const { Option } = Select
@@ -69,6 +70,7 @@ export default function Apis(){
         systemId: values.systemId,
         name: values.name.trim(),
         description: values.description,
+        apiType: values.apiType || 'S',
         authType: values.authType || 'NONE',
         specLink: values.specLink,
         department: values.department,
@@ -91,6 +93,7 @@ export default function Apis(){
       systemId: record.systemId,
       name: record.name,
       description: record.description,
+      apiType: record.apiType || 'S',
       authType: record.authType || 'NONE',
       specLink: record.specLink,
       department: record.department,
@@ -107,6 +110,7 @@ export default function Apis(){
       const payload = {
         name: values.name.trim(),
         description: values.description,
+        apiType: values.apiType,
         authType: values.authType || 'NONE',
         specLink: values.specLink,
         department: values.department,
@@ -138,23 +142,23 @@ export default function Apis(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  function copyId(id){ navigator.clipboard.writeText(id).then(()=>message.success('ID copied')) }
+
 
   const { items, total } = paged()
 
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name', width: 240 },
     { title: 'System', dataIndex: 'systemName', key: 'systemName', width: 180 },
+    { title: 'API Type', dataIndex: 'apiType', key: 'apiType', width: 120, render: v => v ? v : '-' },
     { title: 'Department', dataIndex: 'department', key: 'department', ellipsis: true },
-    { title: 'Contacts', dataIndex: 'contactEmails', key: 'contactEmails', render: v => (v||[]).slice(0,3).map((e,i)=> <div key={i}><a href={`mailto:${e}`}>{e}</a></div>) },
-    { title: 'Tags', dataIndex: 'tags', key: 'tags', render: v => (v||[]).map(t=> <span key={t} style={{ marginRight:6 }}><Tag>{t}</Tag></span>) },
+    { title: 'Contacts', dataIndex: 'contactEmails', key: 'contactEmails', width: 300, ellipsis: true, render: v => (v||[]).slice(0,3).map((e,i)=> <div key={i} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><a href={`mailto:${e}`}>{e}</a></div>) },
+    { title: 'Tags', dataIndex: 'tags', key: 'tags', width: 200, render: v => (v||[]).map(t=> <span key={t} style={{ marginRight:6, display: 'inline-block' }}><Tag>{t}</Tag></span>) },
     { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 360,
       onCell: () => ({ className: 'col-actions' }),
       onHeaderCell: () => ({ className: 'col-actions' }),
       render: (_, record) => (
         <Space>
-          <Button type="primary" size="small" onClick={()=>copyId(record.id)}>Copy</Button>
           <Button type="primary" size="small" onClick={()=>showDetail(record)}>Details</Button>
           <Button type="primary" size="small" onClick={()=>openEdit(record)}>Edit</Button>
           <Popconfirm title="Delete this API?" onConfirm={()=>onDelete(record.id)}>
@@ -198,7 +202,7 @@ export default function Apis(){
       </div>
 
       <Modal title="Create API" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={760}>
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ authType: 'NONE' }}>
+        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ authType: 'NONE', apiType: 'S' }}>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="systemId" label="System" rules={[{ required: true, message: 'System is required' }]}>
@@ -214,6 +218,15 @@ export default function Apis(){
 
           <Row gutter={12}>
             <Col span={12}>
+              <Form.Item name="apiType" label="API Type">
+                <Select>
+                  <Option value="P">P</Option>
+                  <Option value="S">S</Option>
+                  <Option value="E">E</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item name="authType" label="Auth Type">
                 <Select>
                   <Option value="NONE">NONE</Option>
@@ -224,17 +237,12 @@ export default function Apis(){
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="department" label="Department">
-                <Input />
-              </Form.Item>
-            </Col>
           </Row>
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="contactName" label="Contact Name">
-                <Input />
+              <Form.Item name="department" label="Department">
+                <Input.TextArea rows={1} style={{ resize: 'none' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -245,7 +253,7 @@ export default function Apis(){
           </Row>
 
           <Form.Item name="specLink" label="Spec Link">
-            <Input />
+            <Input.TextArea rows={1} style={{ resize: 'none' }} />
           </Form.Item>
 
           <Form.Item name="tags" label="Tags">
@@ -266,7 +274,7 @@ export default function Apis(){
       </Modal>
 
       <Modal title="Edit API" open={editVisible} onCancel={()=>{ setEditVisible(false); setEditing(null) }} footer={null} width={760}>
-        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ authType: 'NONE' }}>
+        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ authType: 'NONE', apiType: 'S' }}>
           <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="systemId" label="System" rules={[{ required: true, message: 'System is required' }]}>
@@ -282,6 +290,15 @@ export default function Apis(){
 
           <Row gutter={12}>
             <Col span={12}>
+              <Form.Item name="apiType" label="API Type">
+                <Select>
+                  <Option value="P">P</Option>
+                  <Option value="S">S</Option>
+                  <Option value="E">E</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item name="authType" label="Auth Type">
                 <Select>
                   <Option value="NONE">NONE</Option>
@@ -292,19 +309,22 @@ export default function Apis(){
                 </Select>
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={12}>
             <Col span={12}>
               <Form.Item name="department" label="Department">
-                <Input />
+                <Input.TextArea rows={1} style={{ resize: 'none' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="contactName" label="Contact Name">
+                <Input.TextArea rows={1} style={{ resize: 'none' }} />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="contactName" label="Contact Name">
-                <Input />
-              </Form.Item>
-            </Col>
             <Col span={12}>
               <Form.Item name="contactEmails" label="Contact Emails" help="Up to 10 emails (comma separated)" rules={[{ validator: emailValidator }]}>
                 <Select mode="tags" tokenSeparators={[',']} placeholder="a@x.com, b@x.com" />
@@ -313,7 +333,7 @@ export default function Apis(){
           </Row>
 
           <Form.Item name="specLink" label="Spec Link">
-            <Input />
+            <Input.TextArea rows={1} style={{ resize: 'none' }} />
           </Form.Item>
 
           <Form.Item name="tags" label="Tags">
@@ -337,13 +357,11 @@ export default function Apis(){
         {detail && (
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="ID">
-              <Space>
-                <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
-                <Button type="link" onClick={()=>copyId(detail.id)}>Copy</Button>
-              </Space>
+              <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Name">{detail.name}</Descriptions.Item>
             <Descriptions.Item label="System">{detail.systemName || detail.systemId}</Descriptions.Item>
+            <Descriptions.Item label="API Type">{detail.apiType || '-'}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Auth Type">{detail.authType || '-'}</Descriptions.Item>
             <Descriptions.Item label="Spec Link">{detail.specLink ? <a href={detail.specLink} target="_blank" rel="noreferrer">Spec</a> : '-'}</Descriptions.Item>

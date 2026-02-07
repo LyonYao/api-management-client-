@@ -927,7 +927,7 @@ export default function Topology() {
                         fontSize="9"
                         fill="#666"
                       >
-                        {system.description}
+                        {system.description.length > 25 ? system.description.substring(0, 25) + '...' : system.description}
                       </text>
                     )}
                     

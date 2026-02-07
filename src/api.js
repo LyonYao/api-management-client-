@@ -6,6 +6,20 @@ const API = axios.create({
   timeout: 15000
 })
 
+// 添加请求拦截器，携带认证token
+API.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
+
 // 将下划线分隔的字段名转换为驼峰命名
 function snakeToCamel(obj) {
   if (Array.isArray(obj)) {

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { Table, Button, Modal, Form, Input, Space, Popconfirm, Descriptions, message } from 'antd'
+import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message } from 'antd'
 import API, { getErrorMessage } from '../api'
+import Button from '../components/Button'
 
 export default function Systems(){
   const [systems, setSystems] = useState([])
@@ -20,6 +21,11 @@ export default function Systems(){
 
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [buttonLoading, setButtonLoading] = useState({})
+
+  function setButtonLoadingState(key, loading) {
+    setButtonLoading(prev => ({ ...prev, [key]: loading }))
+  }
 
   async function load(){
     setLoading(true)
@@ -45,7 +51,7 @@ export default function Systems(){
 
   async function onCreate(values){
     try{
-      await API.post('/api/v1/systems', { name: values.name.trim(), description: values.description })
+      await API.post('/api/v1/systems', { name: values.name.trim(), systemCode: values.systemCode, description: values.description })
       message.success('System created')
       setCreateVisible(false)
       form.resetFields()
@@ -56,14 +62,14 @@ export default function Systems(){
   function openEdit(record){
     setDetailVisible(false)
     setEditing(record)
-    editForm.setFieldsValue({ name: record.name, description: record.description })
+    editForm.setFieldsValue({ name: record.name, systemCode: record.systemCode, description: record.description })
     setEditVisible(true)
   }
 
   async function onEdit(){
     try{
       const values = await editForm.validateFields()
-      await API.put(`/api/v1/systems/${editing.id}`, { name: values.name.trim(), description: values.description })
+      await API.put(`/api/v1/systems/${editing.id}`, { name: values.name.trim(), systemCode: values.systemCode, description: values.description })
       message.success('Updated')
       setEditVisible(false)
       setEditing(null)
@@ -87,12 +93,13 @@ export default function Systems(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  function copyId(id){ navigator.clipboard.writeText(id).then(()=>message.success('ID copied')) }
+
 
   const { items, total } = paged()
 
   const columns = [
-    { title: 'Name', dataIndex: 'name', key: 'name', width: '30%' },
+    { title: 'Name', dataIndex: 'name', key: 'name', width: '25%' },
+    { title: 'System Code', dataIndex: 'systemCode', key: 'systemCode', width: '15%' },
     { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true },
     { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 320,
@@ -100,7 +107,6 @@ export default function Systems(){
       onHeaderCell: () => ({ className: 'col-actions' }),
       render: (_, record) => (
         <Space>
-          <Button type="primary" size="small" onClick={()=>copyId(record.id)}>Copy</Button>
           <Button type="primary" size="small" onClick={()=>showDetail(record)}>Details</Button>
           <Button type="primary" size="small" onClick={()=>openEdit(record)}>Edit</Button>
           <Popconfirm title="Delete this system?" onConfirm={()=>onDelete(record.id)}>
@@ -129,7 +135,6 @@ export default function Systems(){
             rowKey="id"
             loading={loading}
             pagination={false}
-            scroll={{ x: 900 }}
           />
         </div>
 
@@ -148,6 +153,9 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="systemCode" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
+            <Input placeholder="12-character system code" />
+          </Form.Item>
           <Form.Item name="description" label="Description">
             <Input />
           </Form.Item>
@@ -165,6 +173,9 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
+          <Form.Item name="systemCode" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
+            <Input placeholder="12-character system code" />
+          </Form.Item>
           <Form.Item name="description" label="Description">
             <Input />
           </Form.Item>
@@ -181,12 +192,10 @@ export default function Systems(){
         {detail && (
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="ID">
-              <Space>
-                <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
-                <Button type="link" onClick={()=>copyId(detail.id)}>Copy</Button>
-              </Space>
+              <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Name">{detail.name}</Descriptions.Item>
+            <Descriptions.Item label="System Code">{detail.systemCode || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Created">{detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}</Descriptions.Item>
             <Descriptions.Item label="Updated">{detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}</Descriptions.Item>
