@@ -79,17 +79,23 @@ export default function App(){
 
   // 路由保护组件
   function ProtectedRoute({ children }) {
+    useEffect(() => {
+      if (!loading) {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          navigate('/login')
+        } else if (!user) {
+          checkAuth()
+        }
+      }
+    }, [loading, user, navigate])
+
     if (loading) {
       return <div>Loading...</div>
     }
     const token = localStorage.getItem('token')
     if (!token) {
-      navigate('/login')
-      return null
-    }
-    // 如果有token但没有user，尝试获取用户信息
-    if (!user) {
-      checkAuth()
+      return <div>Redirecting...</div>
     }
     return children
   }

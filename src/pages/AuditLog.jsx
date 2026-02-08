@@ -105,10 +105,10 @@ export default function AuditLog() {
   const columns = [
     {
       title: 'Operation',
-      dataIndex: 'operationType',
-      key: 'operationType',
-      render: (operationType) => {
-        const typeInfo = operationTypeMap[operationType]
+      dataIndex: 'operation_type',
+      key: 'operation_type',
+      render: (operation_type) => {
+        const typeInfo = operationTypeMap[operation_type]
         return (
           <Tag color={typeInfo.color}>
             {typeInfo.text}
@@ -118,14 +118,14 @@ export default function AuditLog() {
     },
     {
       title: 'Resource Type',
-      dataIndex: 'resourceType',
-      key: 'resourceType',
-      render: (resourceType) => resourceTypeMap[resourceType] || resourceType
+      dataIndex: 'resource_type',
+      key: 'resource_type',
+      render: (resource_type) => resourceTypeMap[resource_type] || resource_type
     },
     {
       title: 'Resource ID',
-      dataIndex: 'resourceId',
-      key: 'resourceId',
+      dataIndex: 'resource_id',
+      key: 'resource_id',
       ellipsis: true
     },
     {
@@ -136,9 +136,9 @@ export default function AuditLog() {
     },
     {
       title: 'IP Address',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      render: (ipAddress) => ipAddress || '-'
+      dataIndex: 'ip_address',
+      key: 'ip_address',
+      render: (ip_address) => ip_address || '-'
     },
     {
       title: 'Description',
@@ -149,9 +149,9 @@ export default function AuditLog() {
     },
     {
       title: 'Created At',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (createdAt) => createdAt ? dayjs(createdAt).format('YYYY-MM-DD HH:mm:ss') : '-'
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (created_at) => created_at ? dayjs(created_at).format('YYYY-MM-DD HH:mm:ss') : '-'
     },
     {
       title: 'Actions',
@@ -281,46 +281,46 @@ export default function AuditLog() {
           <div>
             <Descriptions column={2} bordered>
               <Descriptions.Item label="Operation">
-                {selectedLog.operationType ? (
-                  <Tag color={operationTypeMap[selectedLog.operationType].color}>
-                    {operationTypeMap[selectedLog.operationType].text}
+                {selectedLog.operation_type ? (
+                  <Tag color={operationTypeMap[selectedLog.operation_type].color}>
+                    {operationTypeMap[selectedLog.operation_type].text}
                   </Tag>
                 ) : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Resource Type">
-                {resourceTypeMap[selectedLog.resourceType] || selectedLog.resourceType || '-'}
+                {resourceTypeMap[selectedLog.resource_type] || selectedLog.resource_type || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Resource ID">
-                {selectedLog.resourceId || '-'}
+                {selectedLog.resource_id || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="User">
                 {selectedLog.username || 'System'}
               </Descriptions.Item>
               <Descriptions.Item label="IP Address">
-                {selectedLog.ipAddress || '-'}
+                {selectedLog.ip_address || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Created At">
-                {selectedLog.createdAt ? dayjs(selectedLog.createdAt).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                {selectedLog.created_at ? dayjs(selectedLog.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Description" span={2}>
                 {selectedLog.description || '-'}
               </Descriptions.Item>
             </Descriptions>
 
-            {selectedLog.beforeData && (
+            {selectedLog.before_data && (
               <div style={{ marginTop: 24 }}>
                 <h4>Before Data</h4>
                 <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto' }}>
-                  {JSON.stringify(selectedLog.beforeData, null, 2)}
+                  {JSON.stringify(selectedLog.before_data, null, 2)}
                 </pre>
               </div>
             )}
 
-            {selectedLog.afterData && (
+            {selectedLog.after_data && (
               <div style={{ marginTop: 24 }}>
                 <h4>After Data</h4>
                 <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto' }}>
-                  {JSON.stringify(selectedLog.afterData, null, 2)}
+                  {JSON.stringify(selectedLog.after_data, null, 2)}
                 </pre>
               </div>
             )}

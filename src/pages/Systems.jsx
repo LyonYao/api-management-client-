@@ -51,7 +51,7 @@ export default function Systems(){
 
   async function onCreate(values){
     try{
-      await API.post('/api/v1/systems', { name: values.name.trim(), systemCode: values.systemCode, description: values.description })
+      await API.post('/api/v1/systems', { name: values.name.trim(), system_code: values.system_code, description: values.description })
       message.success('System created')
       setCreateVisible(false)
       form.resetFields()
@@ -62,14 +62,14 @@ export default function Systems(){
   function openEdit(record){
     setDetailVisible(false)
     setEditing(record)
-    editForm.setFieldsValue({ name: record.name, systemCode: record.systemCode, description: record.description })
+    editForm.setFieldsValue({ name: record.name, system_code: record.system_code, description: record.description })
     setEditVisible(true)
   }
 
   async function onEdit(){
     try{
       const values = await editForm.validateFields()
-      await API.put(`/api/v1/systems/${editing.id}`, { name: values.name.trim(), systemCode: values.systemCode, description: values.description })
+      await API.put(`/api/v1/systems/${editing.id}`, { name: values.name.trim(), system_code: values.system_code, description: values.description })
       message.success('Updated')
       setEditVisible(false)
       setEditing(null)
@@ -99,9 +99,9 @@ export default function Systems(){
 
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name', width: '25%' },
-    { title: 'System Code', dataIndex: 'systemCode', key: 'systemCode', width: '15%' },
+    { title: 'System Code', dataIndex: 'system_code', key: 'system_code', width: '15%' },
     { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true },
-    { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
+    { title: 'Created', dataIndex: 'created_at', key: 'created_at', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 320,
       onCell: () => ({ className: 'col-actions' }),
       onHeaderCell: () => ({ className: 'col-actions' }),
@@ -153,7 +153,7 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="systemCode" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
+          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
             <Input placeholder="12-character system code" />
           </Form.Item>
           <Form.Item name="description" label="Description">
@@ -173,7 +173,7 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="systemCode" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
+          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
             <Input placeholder="12-character system code" />
           </Form.Item>
           <Form.Item name="description" label="Description">
@@ -195,10 +195,10 @@ export default function Systems(){
               <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Name">{detail.name}</Descriptions.Item>
-            <Descriptions.Item label="System Code">{detail.systemCode || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="System Code">{detail.system_code || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Created">{detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}</Descriptions.Item>
-            <Descriptions.Item label="Updated">{detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Created">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Updated">{detail.updated_at ? new Date(detail.updated_at).toLocaleString() : '-'}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

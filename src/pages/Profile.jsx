@@ -18,7 +18,7 @@ export default function Profile() {
         setUser(res.data)
         form.setFieldsValue({
           username: res.data.username,
-          fullName: res.data.fullName,
+          fullName: res.data.full_name,
           email: res.data.email
         })
       }
@@ -34,7 +34,11 @@ export default function Profile() {
   async function saveUserInfo(values) {
     setLoading(true)
     try {
-      const res = await API.put('/api/v1/auth/me', values)
+      const res = await API.put('/api/v1/auth/me', {
+        username: values.username,
+        full_name: values.fullName,
+        email: values.email
+      })
       if (res.data) {
         setUser(res.data)
         setEditing(false)
@@ -70,7 +74,7 @@ export default function Profile() {
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32 }}>
           <Avatar size={80} icon={<UserOutlined />} style={{ marginRight: 24 }} />
           <div>
-            <h2 style={{ margin: 0 }}>{user.fullName || user.username}</h2>
+            <h2 style={{ margin: 0 }}>{user.full_name || user.username}</h2>
             <p style={{ margin: 4, color: '#666' }}>{user.username}</p>
             <p style={{ margin: 4, color: '#666' }}>{user.email}</p>
           </div>
@@ -80,10 +84,10 @@ export default function Profile() {
           <>
             <Descriptions column={2} bordered>
               <Descriptions.Item label="Username">{user.username}</Descriptions.Item>
-              <Descriptions.Item label="Full Name">{user.fullName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Full Name">{user.full_name || '-'}</Descriptions.Item>
               <Descriptions.Item label="Email">{user.email || '-'}</Descriptions.Item>
               <Descriptions.Item label="Created At">
-                {user.createdAt ? new Date(user.createdAt).toLocaleString() : '-'}
+                {user.created_at ? new Date(user.created_at).toLocaleString() : '-'}
               </Descriptions.Item>
             </Descriptions>
             <div style={{ marginTop: 24, textAlign: 'right' }}>
@@ -132,7 +136,7 @@ export default function Profile() {
                     setEditing(false)
                     form.setFieldsValue({
                       username: user.username,
-                      fullName: user.fullName,
+                      fullName: user.full_name,
                       email: user.email
                     })
                   }}

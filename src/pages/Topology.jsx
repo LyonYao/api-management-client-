@@ -1,24 +1,17 @@
 import { useEffect, useState, useRef } from 'react'
 import { Card, Button, message, Modal, Descriptions, Spin, Space, Tag, AutoComplete } from 'antd'
 import { ReloadOutlined, ClearOutlined } from '@ant-design/icons'
+import G6 from '@antv/g6'
 import API, { getErrorMessage } from '../api'
 
 export default function Topology() {
-  const [loading, setLoading] = useState(false)
-  const [detail, setDetailVisible] = useState(false)
-  const [detailData, setDetailData] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [searchSystem, setSearchSystem] = useState('')
   const [allSystems, setAllSystems] = useState([])
   const [focusedSystemId, setFocusedSystemId] = useState(null)
-  const [topologyData, setTopologyData] = useState({ systems: [], connections: [] })
-  const [dragging, setDragging] = useState(null)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const [panning, setPanning] = useState(false)
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
-  const [zoom, setZoom] = useState(1)
-  const [zoomCenter, setZoomCenter] = useState({ x: 0, y: 0 })
-  const svgRef = useRef(null)
+  const [topologyData, setTopologyData] = useState({ systems: [], apis: [], endpoints: [], connections: [] })
+  const graphRef = useRef(null)
+  const graphInstance = useRef(null)
 
   // 获取基础数据
   async function fetchBaseData() {
@@ -67,6 +60,10 @@ export default function Topology() {
     }
   }
 
+  // 数据量限制阈值
+  const MAX_NODES = 100
+  const MAX_EDGES = 200
+  
   // 从实际数据构建拓扑图
   function buildTopologyFromData(rels, systems, apis, endpoints, focusSystemId = null) {
     console.log('Building topology from data:', {
@@ -77,15 +74,44 @@ export default function Topology() {
       focusSystemId
     })
     
+    // 检查数据量是否超过阈值
+    const totalPotentialNodes = systems.length + apis.length + endpoints.length
+    const totalPotentialEdges = rels.length + apis.length + endpoints.length // 包括层级关系边
+    
+    if (totalPotentialNodes > MAX_NODES || totalPotentialEdges > MAX_EDGES) {
+      console.warn('Data volume exceeds threshold, applying limits:', {
+        totalPotentialNodes,
+        totalPotentialEdges,
+        maxNodes: MAX_NODES,
+        maxEdges: MAX_EDGES
+      })
+      
+      // 如果数据量过大且没有焦点系统，提示用户使用搜索功能
+      if (!focusSystemId) {
+        message.warning('数据量较大，请使用搜索功能聚焦特定系统查看')
+      }
+    }
+    
+    // 构建 Map 以提高查找效率
+    const apiMap = new Map()
+    apis.forEach(api => apiMap.set(api.id, api))
+    
+    const endpointMap = new Map()
+    endpoints.forEach(endpoint => endpointMap.set(endpoint.id, endpoint))
+    
+    const systemMap = new Map()
+    systems.forEach(system => systemMap.set(system.id, system))
+    
     let relevantSystemIds = new Set()
     let relevantApiIds = new Set()
+    let relevantEndpointIds = new Set()
 
     // 如果有焦点系统，找到所有相关的系统和API
     if (focusSystemId) {
       relevantSystemIds.add(focusSystemId)
       
       // 添加焦点系统下的所有API
-      apis.filter(a => a.systemId === focusSystemId).forEach(a => {
+      apis.filter(a => a.system_id === focusSystemId).forEach(a => {
         relevantApiIds.add(a.id)
       })
       
@@ -94,21 +120,21 @@ export default function Topology() {
         let sourceSystemId, targetSystemId, sourceApiId, targetApiId
         
         // 解析调用方
-        if (r.callerType === 'SYSTEM') {
-          sourceSystemId = r.callerId
+        if (r.caller_type === 'SYSTEM') {
+          sourceSystemId = r.caller_id
         } else {
-          const callerApi = apis.find(a => a.id === r.callerId)
-          sourceApiId = r.callerId
-          sourceSystemId = callerApi?.systemId
+          const callerApi = apiMap.get(r.caller_id)
+          sourceApiId = r.caller_id
+          sourceSystemId = callerApi?.system_id
         }
         
         // 解析被调用方
-        if (r.calleeType === 'SYSTEM') {
-          targetSystemId = r.calleeId
+        if (r.callee_type === 'SYSTEM') {
+          targetSystemId = r.callee_id
         } else {
-          const calleeApi = apis.find(a => a.id === r.calleeId)
-          targetApiId = r.calleeId
-          targetSystemId = calleeApi?.systemId
+          const calleeApi = apiMap.get(r.callee_id)
+          targetApiId = r.callee_id
+          targetSystemId = calleeApi?.system_id
         }
         
         // 如果与焦点系统相关，包含相关的系统和API
@@ -117,55 +143,89 @@ export default function Topology() {
           if (targetSystemId) relevantSystemIds.add(targetSystemId)
           if (sourceApiId) relevantApiIds.add(sourceApiId)
           if (targetApiId) relevantApiIds.add(targetApiId)
+          if (r.endpoint_id) relevantEndpointIds.add(r.endpoint_id)
         }
       })
     } else {
       // 显示所有系统和API
       systems.forEach(s => relevantSystemIds.add(s.id))
       apis.forEach(a => relevantApiIds.add(a.id))
+      endpoints.forEach(e => relevantEndpointIds.add(e.id))
     }
     
     // 确保所有在关系中出现的系统和API都被包含
-    rels.forEach(r => {
-      // 处理调用方
-      if (r.callerType === 'SYSTEM') {
-        relevantSystemIds.add(r.callerId)
-      } else {
-        const callerApi = apis.find(a => a.id === r.callerId)
-        if (callerApi) {
-          relevantSystemIds.add(callerApi.systemId)
-          relevantApiIds.add(callerApi.id)
+    if (focusSystemId) {
+      // 只处理与焦点系统相关的关系
+      rels.forEach(r => {
+        let sourceSystemId, targetSystemId
+        
+        // 解析调用方系统ID
+        if (r.caller_type === 'SYSTEM') {
+          sourceSystemId = r.caller_id
+        } else {
+          const callerApi = apiMap.get(r.caller_id)
+          sourceSystemId = callerApi?.system_id
         }
-      }
-      
-      // 处理被调用方
-      if (r.calleeType === 'SYSTEM') {
-        relevantSystemIds.add(r.calleeId)
-      } else {
-        const calleeApi = apis.find(a => a.id === r.calleeId)
-        if (calleeApi) {
-          relevantSystemIds.add(calleeApi.systemId)
-          relevantApiIds.add(calleeApi.id)
+        
+        // 解析被调用方系统ID
+        if (r.callee_type === 'SYSTEM') {
+          targetSystemId = r.callee_id
+        } else {
+          const calleeApi = apiMap.get(r.callee_id)
+          targetSystemId = calleeApi?.system_id
         }
-      }
-      
-      // 处理端点
-      if (r.endpointId) {
-        const endpoint = endpoints.find(e => e.id === r.endpointId)
-        if (endpoint) {
-          const endpointApi = apis.find(a => a.id === endpoint.apiId)
-          if (endpointApi) {
-            relevantSystemIds.add(endpointApi.systemId)
-            relevantApiIds.add(endpointApi.id)
+        
+        // 只包含与焦点系统相关的关系
+        if (sourceSystemId === focusSystemId || targetSystemId === focusSystemId) {
+          // 处理调用方
+          if (r.caller_type === 'SYSTEM') {
+            relevantSystemIds.add(r.caller_id)
+          } else {
+            const callerApi = apiMap.get(r.caller_id)
+            if (callerApi) {
+              relevantSystemIds.add(callerApi.system_id)
+              relevantApiIds.add(callerApi.id)
+            }
+          }
+          
+          // 处理被调用方
+          if (r.callee_type === 'SYSTEM') {
+            relevantSystemIds.add(r.callee_id)
+          } else {
+            const calleeApi = apiMap.get(r.callee_id)
+            if (calleeApi) {
+              relevantSystemIds.add(calleeApi.system_id)
+              relevantApiIds.add(calleeApi.id)
+            }
+          }
+          
+          // 处理端点
+          if (r.endpoint_id) {
+            const endpoint = endpointMap.get(r.endpoint_id)
+            if (endpoint) {
+              relevantEndpointIds.add(endpoint.id)
+              const endpointApi = apiMap.get(endpoint.api_id)
+              if (endpointApi) {
+                relevantSystemIds.add(endpointApi.system_id)
+                relevantApiIds.add(endpointApi.id)
+              }
+            }
           }
         }
-      }
-    })
+      })
+    }
     
     // 确保所有API都被包含在对应的系统中
     apis.forEach(api => {
-      if (relevantSystemIds.has(api.systemId)) {
+      if (relevantSystemIds.has(api.system_id)) {
         relevantApiIds.add(api.id)
+      }
+    })
+    
+    // 确保所有端点都被包含在对应的API中
+    endpoints.forEach(endpoint => {
+      if (relevantApiIds.has(endpoint.api_id)) {
+        relevantEndpointIds.add(endpoint.id)
       }
     })
 
@@ -174,13 +234,13 @@ export default function Topology() {
       let connectionCount = 0
       rels.forEach(r => {
         // 检查系统是否是调用方
-        if (r.callerType === 'SYSTEM' && r.callerId === systemId) {
+        if (r.caller_type === 'SYSTEM' && r.caller_id === systemId) {
           connectionCount++
         }
         // 检查系统是否包含被调用的API
-        if (r.calleeType === 'API') {
-          const calleeApi = apis.find(a => a.id === r.calleeId)
-          if (calleeApi && calleeApi.systemId === systemId) {
+        if (r.callee_type === 'API') {
+          const calleeApi = apiMap.get(r.callee_id)
+          if (calleeApi && calleeApi.system_id === systemId) {
             connectionCount++
           }
         }
@@ -199,171 +259,100 @@ export default function Topology() {
           connectionCount
         }
       })
-      .sort((a, b) => b.connectionCount - a.connectionCount) // 按连接数降序排序
-      .map((system, systemIndex) => {
-        let systemX, systemY
-        
-        // 布局算法：连接数最多的系统在中心，其他系统围绕在周围
-        if (systemIndex === 0) {
-          // 中心系统
-          systemX = 400 - 175 // 画布中心减去系统宽度的一半
-          systemY = 300 - 100 // 画布中心减去系统高度的一半
-        } else {
-          // 周围系统 - 使用网格布局，确保所有系统都可见
-          const systemRow = Math.floor(systemIndex / 3)
-          const systemCol = systemIndex % 3
-          systemX = 40 + systemCol * (350 + 80)
-          systemY = 40 + systemRow * (200 + 80)
-        }
+    
+    // 构建系统数据 Map
+    const systemDataMap = new Map()
+    systemData.forEach(system => systemDataMap.set(system.id, system))
 
-        // 处理系统下的API
-        let currentApiY = 50
-        const systemApis = apis
-          .filter(a => relevantApiIds.has(a.id) && a.systemId === system.id)
-          .map((api, apiIndex) => {
-            // 计算API位置（相对于系统）
-            const apiY = currentApiY
-
-            // 处理API下的端点
-                const apiEndpoints = endpoints
-                  .filter(e => e.apiId === api.id)
-                  .map((endpoint, endpointIndex) => {
-                    // 计算端点位置（相对于API），添加15px的padding
-                    const endpointCol = endpointIndex % 4
-                    const endpointRow = Math.floor(endpointIndex / 4)
-                    const endpointX = 15 + endpointCol * (25 + 10) // 添加15px的padding和间距
-                    const endpointY = 30 + endpointRow * (25 + 10) // 添加15px的padding和间距
-
-                    return {
-                      id: endpoint.id,
-                      name: endpoint.path,
-                      method: endpoint.httpMethod || endpoint.method,
-                      path: endpoint.path,
-                      x: endpointX,
-                      y: endpointY,
-                      width: 20,
-                      height: 20
-                    }
-                  })
-
-            // 计算API高度，基于端点数量
-            const numEndpointRows = Math.max(1, Math.floor((apiEndpoints.length - 1) / 4) + 1)
-            const apiHeight = 30 + numEndpointRows * (25 + 10) + 15 // 顶部padding + 行高 + 底部padding
-
-            // 更新下一个API的Y位置
-            currentApiY += apiHeight + 15
-
-            return {
-              id: api.id,
-              name: api.name,
-              x: 15,
-              y: apiY,
-              width: 320,
-              height: apiHeight,
-              endpoints: apiEndpoints
-            }
-          })
-
-        // 计算系统高度，基于API数量和高度
-        const totalApiHeight = systemApis.reduce((total, api) => {
-          return total + api.height + 15 // API高度 + 间距
-        }, 0)
-        const systemHeight = Math.max(200, 50 + totalApiHeight)
-
+    // 构建API数据结构
+    const apiData = apis
+      .filter(a => relevantApiIds.has(a.id))
+      .map(api => {
+        const system = systemDataMap.get(api.system_id)
         return {
-          id: system.id,
-          name: system.name,
-          description: system.description,
-          connectionCount: system.connectionCount,
-          x: systemX,
-          y: systemY,
-          width: 350,
-          height: systemHeight,
-          apis: systemApis
+          ...api,
+          system_name: system?.name
+        }
+      })
+    
+    // 构建API数据 Map
+    const apiDataMap = new Map()
+    apiData.forEach(api => apiDataMap.set(api.id, api))
+
+    // 构建端点数据结构
+    const endpointData = endpoints
+      .filter(e => {
+        return relevantEndpointIds.has(e.id) && apiDataMap.has(e.api_id)
+      })
+      .map(endpoint => {
+        const api = apiDataMap.get(endpoint.api_id)
+        return {
+          ...endpoint,
+          api_name: api?.name,
+          system_name: api?.system_name,
+          method: endpoint.http_method || endpoint.method
         }
       })
 
     // 构建连接数据
     const connections = rels
+      .filter(r => {
+        // 只包含与焦点系统相关的连接
+        if (!focusSystemId) return true
+        
+        let sourceSystemId, targetSystemId
+        
+        // 解析调用方系统ID
+        if (r.caller_type === 'SYSTEM') {
+          sourceSystemId = r.caller_id
+        } else {
+          const callerApi = apiMap.get(r.caller_id)
+          sourceSystemId = callerApi?.system_id
+        }
+        
+        // 解析被调用方系统ID
+        if (r.callee_type === 'SYSTEM') {
+          targetSystemId = r.callee_id
+        } else {
+          const calleeApi = apiMap.get(r.callee_id)
+          targetSystemId = calleeApi?.system_id
+        }
+        
+        return sourceSystemId === focusSystemId || targetSystemId === focusSystemId
+      })
       .map(r => {
         let sourceId, targetId, sourceType, targetType
 
         // 确定源节点
-        if (r.callerType === 'SYSTEM') {
-          sourceId = r.callerId
+        if (r.caller_type === 'SYSTEM') {
+          sourceId = r.caller_id
           sourceType = 'system'
         } else {
-          sourceId = r.callerId
+          sourceId = r.caller_id
           sourceType = 'api'
         }
 
         // 确定目标节点（使用端点）
-        targetId = r.endpointId
+        targetId = r.endpoint_id
         targetType = 'endpoint'
 
         return {
           id: r.id,
           source: sourceId,
-          sourceType,
           target: targetId,
+          sourceType,
           targetType,
-          method: r.endpointMethod,
-          path: r.endpointPath,
-          callerType: r.callerType,
-          calleeType: r.calleeType,
-          callerName: r.callerName,
-          calleeName: r.calleeName,
-          calleeId: r.calleeId // 添加被调用方ID，用于查找对应的API
+          method: r.endpoint_method,
+          path: r.endpoint_path,
+          caller_type: r.caller_type,
+          callee_type: r.callee_type,
+          caller_name: r.caller_name,
+          callee_name: r.callee_name,
+          callee_id: r.callee_id
         }
       })
 
-    // 确保所有关系中的端点都被添加到对应的API容器中
-    connections.forEach(connection => {
-      const { target: endpointId, calleeId } = connection
-      
-      // 检查端点是否已经存在于某个API容器中
-      let endpointExists = false
-      for (const system of systemData) {
-        for (const api of system.apis) {
-          if (api.endpoints.some(e => e.id === endpointId)) {
-            endpointExists = true
-            break
-          }
-        }
-        if (endpointExists) break
-      }
-      
-      // 如果端点不存在，找到对应的API并添加
-      if (!endpointExists && calleeId) {
-        const api = apis.find(a => a.id === calleeId)
-        if (api) {
-          const system = systemData.find(s => s.id === api.systemId)
-          if (system) {
-            const apiInSystem = system.apis.find(a => a.id === api.id)
-            if (apiInSystem) {
-              // 创建新的端点
-              const endpointCol = apiInSystem.endpoints.length % 3
-              const endpointRow = Math.floor(apiInSystem.endpoints.length / 3)
-              const endpointX = 10 + endpointCol * (100 + 10)
-              const endpointY = 25 + endpointRow * (35 + 10)
-              
-              apiInSystem.endpoints.push({
-                id: endpointId,
-                name: connection.path,
-                method: connection.method,
-                path: connection.path,
-                x: endpointX,
-                y: endpointY,
-                width: 100,
-                height: 35
-              })
-            }
-          }
-        }
-      }
-    })
-
-    return { systems: systemData, connections }
+    return { systems: systemData, apis: apiData, endpoints: endpointData, connections }
   }
 
   // 创建测试数据
@@ -373,93 +362,58 @@ export default function Topology() {
         id: '1',
         name: '用户服务',
         description: '处理用户认证和管理',
-        x: 40,
-        y: 40,
-        width: 350,
-        height: 200,
-        apis: [
-          {
-            id: '1-1',
-            name: '用户API',
-            x: 15,
-            y: 50,
-            width: 320,
-            height: 60,
-            endpoints: [
-              {
-                id: '1-1-1',
-                name: '/api/v1/users',
-                method: 'GET',
-                path: '/api/v1/users',
-                x: 15,
-                y: 30,
-                width: 20,
-                height: 20
-              },
-              {
-                id: '1-1-2',
-                name: '/api/v1/users',
-                method: 'POST',
-                path: '/api/v1/users',
-                x: 45,
-                y: 30,
-                width: 20,
-                height: 20
-              },
-              {
-                id: '1-1-3',
-                name: '/api/v1/login',
-                method: 'POST',
-                path: '/api/v1/login',
-                x: 75,
-                y: 30,
-                width: 20,
-                height: 20
-              }
-            ]
-          }
-        ]
+        connectionCount: 2
       },
       {
         id: '2',
         name: '订单服务',
         description: '处理订单业务逻辑',
-        x: 470,
-        y: 40,
-        width: 350,
-        height: 200,
-        apis: [
-          {
-            id: '2-1',
-            name: '订单API',
-            x: 15,
-            y: 50,
-            width: 320,
-            height: 60,
-            endpoints: [
-              {
-                id: '2-1-1',
-                name: '/api/v1/orders',
-                method: 'GET',
-                path: '/api/v1/orders',
-                x: 15,
-                y: 30,
-                width: 20,
-                height: 20
-              },
-              {
-                id: '2-1-2',
-                name: '/api/v1/orders',
-                method: 'POST',
-                path: '/api/v1/orders',
-                x: 45,
-                y: 30,
-                width: 20,
-                height: 20
-              }
-            ]
-          }
-        ]
+        connectionCount: 1
+      }
+    ]
+
+    const apis = [
+      {
+        id: '1-1',
+        name: '用户API',
+        systemId: '1',
+        systemName: '用户服务'
+      },
+      {
+        id: '2-1',
+        name: '订单API',
+        systemId: '2',
+        systemName: '订单服务'
+      }
+    ]
+
+    const endpoints = [
+      {
+        id: '1-1-1',
+        name: '/api/v1/users',
+        method: 'GET',
+        path: '/api/v1/users',
+        apiId: '1-1',
+        apiName: '用户API',
+        systemName: '用户服务'
+      },
+      {
+        id: '1-1-2',
+        name: '/api/v1/users',
+        method: 'POST',
+        path: '/api/v1/users',
+        apiId: '1-1',
+        apiName: '用户API',
+        systemName: '用户服务'
+      },
+      {
+        id: '1-1-3',
+        name: '/api/v1/login',
+        method: 'POST',
+        path: '/api/v1/login',
+        apiId: '1-1',
+        apiName: '用户API',
+        systemName: '用户服务'
       }
     ]
 
@@ -467,8 +421,8 @@ export default function Topology() {
       {
         id: '1',
         source: '2',
-        sourceType: 'system',
         target: '1-1-1',
+        sourceType: 'system',
         targetType: 'endpoint',
         method: 'GET',
         path: '/api/v1/users',
@@ -480,8 +434,8 @@ export default function Topology() {
       {
         id: '2',
         source: '2-1',
-        sourceType: 'api',
         target: '1-1-3',
+        sourceType: 'api',
         targetType: 'endpoint',
         method: 'POST',
         path: '/api/v1/login',
@@ -492,20 +446,782 @@ export default function Topology() {
       }
     ]
 
-    return { systems, connections }
+    return { systems, apis, endpoints, connections }
+  }
+
+  // 转换数据为 G6 格式
+  function convertToG6Data(data, focusSystemId = null) {
+    const { systems, apis, endpoints, connections } = data
+    
+    // 创建节点
+    const nodes = []
+    
+    // 计算画布中心
+    const centerX = graphRef.current ? graphRef.current.clientWidth / 2 : 400
+    const centerY = graphRef.current ? graphRef.current.clientHeight / 2 : 300
+    
+    // 为节点生成随机初始位置，避免堆积在左上角
+    const generateInitialPosition = (index, total) => {
+      // 生成围绕中心的随机位置
+      const angle = (index / total) * Math.PI * 2
+      const radius = Math.sqrt(index) * 50 // 使节点分布更均匀
+      
+      return {
+        x: centerX + Math.cos(angle) * radius,
+        y: centerY + Math.sin(angle) * radius
+      }
+    }
+    
+    // 如果没有传入焦点系统ID，尝试自动识别
+    if (!focusSystemId) {
+      // 简单判断：如果只有一个系统节点，或者有一个系统节点与其他节点有更多连接，将其作为焦点系统
+      if (systems.length === 1) {
+        focusSystemId = systems[0].id
+      } else if (systems.length > 1) {
+        // 找到连接数最多的系统
+        let maxConnections = -1
+        systems.forEach(system => {
+          if (system.connectionCount > maxConnections) {
+            maxConnections = system.connectionCount
+            focusSystemId = system.id
+          }
+        })
+      }
+    }
+    
+    // 添加系统节点
+    systems.forEach((system, index) => {
+      let x, y
+      // 如果是焦点系统，将其放在中心位置
+      if (system.id === focusSystemId) {
+        x = centerX
+        y = centerY
+      } else {
+        const pos = generateInitialPosition(index, systems.length)
+        x = pos.x
+        y = pos.y
+      }
+      
+      nodes.push({
+        id: system.id,
+        type: 'system',
+        label: system.name,
+        description: system.description,
+        connectionCount: system.connectionCount,
+        category: 'system',
+        size: 80,
+        color: system.id === focusSystemId ? '#ff7875' : '#1890ff',
+        x: x,
+        y: y
+      })
+    })
+    
+    // 添加API节点
+    apis.forEach((api, index) => {
+      const pos = generateInitialPosition(index + systems.length, systems.length + apis.length)
+      nodes.push({
+        id: api.id,
+        type: 'api',
+        label: api.name,
+        system_id: api.system_id,
+        system_name: api.system_name,
+        category: 'api',
+        size: 40,
+        color: '#52c41a',
+        x: pos.x,
+        y: pos.y
+      })
+    })
+    
+    // 添加端点节点
+    endpoints.forEach((endpoint, index) => {
+      const pos = generateInitialPosition(index + systems.length + apis.length, systems.length + apis.length + endpoints.length)
+      nodes.push({
+        id: endpoint.id,
+        type: 'endpoint',
+        label: endpoint.method,
+        path: endpoint.path,
+        method: endpoint.method,
+        api_id: endpoint.api_id,
+        api_name: endpoint.api_name,
+        system_name: endpoint.system_name,
+        category: 'endpoint',
+        size: 20,
+        color: '#fa8c16',
+        x: pos.x,
+        y: pos.y
+      })
+    })
+    
+    // 添加层级关系边（系统 -> API, API -> 端点）
+    const hierarchyEdges = []
+    apis.forEach(api => {
+      hierarchyEdges.push({
+        id: `hierarchy-${api.id}`,
+        source: api.system_id,
+        target: api.id,
+        type: 'hierarchy',
+        style: {
+          stroke: '#e8e8e8',
+          lineWidth: 1,
+          endArrow: true
+        }
+      })
+    })
+    
+    endpoints.forEach(endpoint => {
+      hierarchyEdges.push({
+        id: `hierarchy-${endpoint.id}`,
+        source: endpoint.api_id,
+        target: endpoint.id,
+        type: 'hierarchy',
+        style: {
+          stroke: '#e8e8e8',
+          lineWidth: 1,
+          endArrow: true
+        }
+      })
+    })
+    
+    // 添加调用关系边
+    const callEdges = connections.map(connection => {
+      return {
+        id: connection.id,
+        source: connection.source,
+        target: connection.target,
+        type: 'call',
+        method: connection.method,
+        path: connection.path,
+        caller_type: connection.callerType,
+        callee_type: connection.calleeType,
+        caller_name: connection.callerName,
+        callee_name: connection.calleeName,
+        style: {
+          stroke: '#52c41a',
+          lineWidth: 1.2,
+          endArrow: true,
+          lineDash: [8, 4]
+        }
+      }
+    })
+    
+    return {
+      nodes,
+      edges: [...hierarchyEdges, ...callEdges]
+    }
+  }
+
+  // 初始化图表
+  function initGraph() {
+    if (!graphRef.current) {
+      console.error('Graph container not found');
+      return null;
+    }
+    
+    // 销毁旧实例
+    if (graphInstance.current) {
+      graphInstance.current.destroy();
+    }
+    
+    try {
+      // 创建新实例
+      const graph = new G6.Graph({
+        container: graphRef.current,
+        width: graphRef.current.clientWidth,
+        height: graphRef.current.clientHeight,
+        modes: {
+          default: ['drag-canvas', 'zoom-canvas', 'drag-node']
+        },
+        defaultNode: {
+          style: {
+            fill: '#fff',
+            stroke: '#1890ff',
+            lineWidth: 1
+          }
+        },
+        defaultEdge: {
+          style: {
+            stroke: '#91d5ff',
+            lineWidth: 1.5,
+            endArrow: true
+          }
+        },
+        layout: {
+          type: 'force',
+          center: [graphRef.current.clientWidth / 2, graphRef.current.clientHeight / 2],
+          linkDistance: 80,
+          nodeStrength: -300, // 增加节点排斥力，使节点更快散开
+          edgeStrength: 0.3, // 增加边的拉力，使布局更快收敛
+          preventOverlap: true,
+          collisionRadius: 50,
+          animate: false,
+          damping: 0.9, // 增加阻尼，减少震荡
+          maxIterations: 80 // 减少最大迭代次数，加快布局计算
+        }
+      });
+      
+      console.log('Graph instance created successfully');
+      
+      // 注册自定义节点
+      G6.registerNode('system', {
+        draw(cfg, group) {
+          const size = cfg.size;
+          
+          // 创建圆形
+          const circle = group.addShape('circle', {
+            attrs: {
+              x: 0,
+              y: 0,
+              r: size / 2,
+              fill: cfg.color,
+              stroke: cfg.color,
+              lineWidth: 1
+            }
+          });
+          
+          // 创建标题
+          group.addShape('text', {
+            attrs: {
+              x: 0,
+              y: 4,
+              text: cfg.label,
+              fontSize: 10,
+              fontWeight: 'bold',
+              fill: '#fff',
+              textAlign: 'center',
+              textBaseline: 'middle'
+            }
+          });
+          
+          return circle;
+        }
+      });
+      
+      G6.registerNode('api', {
+        draw(cfg, group) {
+          const size = cfg.size;
+          
+          // 创建圆形
+          const circle = group.addShape('circle', {
+            attrs: {
+              x: 0,
+              y: 0,
+              r: size / 2,
+              fill: cfg.color,
+              stroke: cfg.color,
+              lineWidth: 1
+            }
+          });
+          
+          // 创建标题
+          group.addShape('text', {
+            attrs: {
+              x: 0,
+              y: 2,
+              text: cfg.label,
+              fontSize: 8,
+              fontWeight: 'bold',
+              fill: '#fff',
+              textAlign: 'center',
+              textBaseline: 'middle'
+            }
+          });
+          
+          return circle;
+        }
+      });
+      
+      G6.registerNode('endpoint', {
+        draw(cfg, group) {
+          const size = cfg.size;
+          
+          // 创建圆形
+          const circle = group.addShape('circle', {
+            attrs: {
+              x: 0,
+              y: 0,
+              r: size / 2,
+              fill: cfg.color,
+              stroke: cfg.color,
+              lineWidth: 1
+            }
+          });
+          
+          // 创建方法标签
+          group.addShape('text', {
+            attrs: {
+              x: 0,
+              y: 2,
+              text: cfg.label,
+              fontSize: 6,
+              fontWeight: 'bold',
+              fill: '#fff',
+              textAlign: 'center',
+              textBaseline: 'middle'
+            }
+          });
+          
+          return circle;
+        }
+      });
+      
+      // 添加交互
+      graph.on('node:click', (e) => {
+        const node = e.item;
+        const model = node.getModel();
+        
+        if (model.type === 'system') {
+          console.log('System clicked:', model);
+        } else if (model.type === 'api') {
+          console.log('API clicked:', model);
+        } else if (model.type === 'endpoint') {
+          console.log('Endpoint clicked:', model);
+        }
+      });
+      
+      // 添加悬停提示和节点放大动画
+      let tooltipCache = {
+        tooltip: null,
+        text1: null,
+        text2: null,
+        text3: null
+      };
+      let tooltipTimer = null;
+      
+      graph.on('node:mouseenter', (e) => {
+        const node = e.item;
+        const model = node.getModel();
+        
+        graph.get('canvas').setCursor('pointer');
+        
+        // 清除旧的定时器
+        if (tooltipTimer) {
+          clearTimeout(tooltipTimer);
+        }
+        
+        // 节点放大动画
+        const group = node.get('group');
+        if (group) {
+          const keyShape = node.get('keyShape');
+          if (keyShape) {
+            const originalSize = model.size;
+            keyShape.animate({
+              r: (originalSize / 2) + 2
+            }, {
+              duration: 200
+            });
+          }
+        }
+        
+        // 延迟创建 tooltip
+        tooltipTimer = setTimeout(() => {
+          // 清除旧的 tooltip
+          if (tooltipCache.tooltip) {
+            if (!tooltipCache.tooltip.destroyed) {
+              tooltipCache.tooltip.remove();
+            }
+            if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
+              tooltipCache.text1.remove();
+            }
+            if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
+              tooltipCache.text2.remove();
+            }
+            if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
+              tooltipCache.text3.remove();
+            }
+            tooltipCache = {
+              tooltip: null,
+              text1: null,
+              text2: null,
+              text3: null
+            };
+          }
+          
+          const canvas = graph.get('canvas');
+          
+          // 创建 tooltip 容器
+          tooltipCache.tooltip = canvas.addShape('rect', {
+            attrs: {
+              x: e.x + 10,
+              y: e.y + 10,
+              width: 200,
+              height: 0,
+              fill: 'rgba(0, 0, 0, 0.7)',
+              radius: 4,
+              opacity: 0
+            },
+            capture: false
+          });
+          
+          // 根据节点类型显示不同的信息
+          if (model.type === 'system') {
+            tooltipCache.text1 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 25,
+                text: model.label,
+                fontSize: 12,
+                fontWeight: 'bold',
+                fill: '#fff',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            tooltipCache.text2 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 45,
+                text: `描述: ${model.description || '无'}`,
+                fontSize: 10,
+                fill: '#ccc',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            tooltipCache.text3 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 65,
+                text: `连接数: ${model.connectionCount}`,
+                fontSize: 10,
+                fill: '#ccc',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            // 展开 tooltip
+            tooltipCache.tooltip.animate({
+              height: 60,
+              opacity: 1
+            }, {
+              duration: 200
+            });
+            
+            // 显示文本
+            setTimeout(() => {
+              if (tooltipCache.text1) {
+                tooltipCache.text1.attr('opacity', 1);
+              }
+              setTimeout(() => {
+                if (tooltipCache.text2) {
+                  tooltipCache.text2.attr('opacity', 1);
+                }
+                setTimeout(() => {
+                  if (tooltipCache.text3) {
+                    tooltipCache.text3.attr('opacity', 1);
+                  }
+                  graph.paint();
+                }, 50);
+              }, 50);
+            }, 100);
+          } else if (model.type === 'api') {
+            tooltipCache.text1 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 25,
+                text: model.label,
+                fontSize: 12,
+                fontWeight: 'bold',
+                fill: '#fff',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            tooltipCache.text2 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 45,
+                text: `系统: ${model.system_name}`,
+                fontSize: 10,
+                fill: '#ccc',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            // 展开 tooltip
+            tooltipCache.tooltip.animate({
+              height: 50,
+              opacity: 1
+            }, {
+              duration: 200
+            });
+            
+            // 显示文本
+            setTimeout(() => {
+              if (tooltipCache.text1) {
+                tooltipCache.text1.attr('opacity', 1);
+              }
+              setTimeout(() => {
+                if (tooltipCache.text2) {
+                  tooltipCache.text2.attr('opacity', 1);
+                }
+                graph.paint();
+              }, 50);
+            }, 100);
+          } else if (model.type === 'endpoint') {
+            tooltipCache.text1 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 25,
+                text: model.path,
+                fontSize: 12,
+                fill: '#fff',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            tooltipCache.text2 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 45,
+                text: `${model.method} | ${model.api_name}`,
+                fontSize: 10,
+                fill: '#ccc',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            tooltipCache.text3 = canvas.addShape('text', {
+              attrs: {
+                x: e.x + 20,
+                y: e.y + 65,
+                text: `系统: ${model.system_name}`,
+                fontSize: 10,
+                fill: '#ccc',
+                textAlign: 'left',
+                opacity: 0
+              },
+              capture: false
+            });
+            
+            // 展开 tooltip
+            tooltipCache.tooltip.animate({
+              height: 60,
+              opacity: 1
+            }, {
+              duration: 200
+            });
+            
+            // 显示文本
+            setTimeout(() => {
+              if (tooltipCache.text1) {
+                tooltipCache.text1.attr('opacity', 1);
+              }
+              setTimeout(() => {
+                if (tooltipCache.text2) {
+                  tooltipCache.text2.attr('opacity', 1);
+                }
+                setTimeout(() => {
+                  if (tooltipCache.text3) {
+                    tooltipCache.text3.attr('opacity', 1);
+                  }
+                  graph.paint();
+                }, 50);
+              }, 50);
+            }, 100);
+          }
+        }, 100);
+      });
+      
+      graph.on('node:mouseleave', (e) => {
+        const node = e.item;
+        const model = node.getModel();
+        
+        graph.get('canvas').setCursor('default');
+        
+        // 清除定时器
+        if (tooltipTimer) {
+          clearTimeout(tooltipTimer);
+          tooltipTimer = null;
+        }
+        
+        // 节点恢复原始大小
+        const shape = node.get('keyShape');
+        if (shape) {
+          shape.animate({
+            r: model.size / 2
+          }, {
+            duration: 200
+          });
+        }
+        
+        // 隐藏 tooltip
+        if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
+          // 淡出文本
+          if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
+            tooltipCache.text3.attr('opacity', 0);
+          }
+          setTimeout(() => {
+            if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
+              tooltipCache.text2.attr('opacity', 0);
+            }
+            setTimeout(() => {
+              if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
+                tooltipCache.text1.attr('opacity', 0);
+              }
+              setTimeout(() => {
+                // 收起 tooltip
+                if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
+                  tooltipCache.tooltip.animate({
+                    height: 0,
+                    opacity: 0
+                  }, {
+                    duration: 150,
+                    callback: () => {
+                      // 动画结束后移除元素
+                      if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
+                        tooltipCache.tooltip.remove();
+                      }
+                      if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
+                        tooltipCache.text1.remove();
+                      }
+                      if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
+                        tooltipCache.text2.remove();
+                      }
+                      if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
+                        tooltipCache.text3.remove();
+                      }
+                      tooltipCache = {
+                        tooltip: null,
+                        text1: null,
+                        text2: null,
+                        text3: null
+                      };
+                      graph.paint();
+                    }
+                  });
+                }
+              }, 50);
+            }, 50);
+          }, 50);
+        } else {
+          // 直接清理缓存
+          tooltipCache = {
+            tooltip: null,
+            text1: null,
+            text2: null,
+            text3: null
+          };
+        }
+      });
+      
+      graphInstance.current = graph;
+      console.log('Graph initialized successfully');
+      return graph;
+    } catch (error) {
+      console.error('Error initializing graph:', error);
+      return null;
+    }
+  }
+
+  // 缓存上一次的 G6 数据，用于比较是否需要重新渲染
+  let lastG6Data = null
+  
+  // 渲染图表
+  function renderGraph(data, focusSystemId = null) {
+    // 确保 graphRef.current 存在
+    if (!graphRef.current) {
+      console.warn('Graph container not ready, waiting for DOM to render');
+      // 延迟一下再试
+      setTimeout(() => {
+        renderGraph(data, focusSystemId);
+      }, 50); // 减少延迟时间
+      return;
+    }
+    
+    if (!graphInstance.current) {
+      const graph = initGraph()
+      if (!graph) {
+        // 如果初始化失败，延迟后重试
+        console.warn('Graph initialization failed, retrying...');
+        setTimeout(() => {
+          renderGraph(data, focusSystemId);
+        }, 50); // 减少延迟时间
+        return;
+      }
+    }
+    
+    const graph = graphInstance.current
+    if (!graph) {
+      // 如果graph仍然不存在，延迟后重试
+      console.warn('Graph instance not available, retrying...');
+      setTimeout(() => {
+        renderGraph(data, focusSystemId);
+      }, 50); // 减少延迟时间
+      return;
+    }
+    
+    const g6Data = convertToG6Data(data, focusSystemId)
+    
+    // 简单比较数据是否变化，避免不必要的渲染
+    const dataChanged = !lastG6Data || 
+      lastG6Data.nodes.length !== g6Data.nodes.length || 
+      lastG6Data.edges.length !== g6Data.edges.length
+    
+    if (dataChanged) {
+      console.log('Rendering graph with new data:', {
+        nodes: g6Data.nodes.length,
+        edges: g6Data.edges.length,
+        focusSystemId: focusSystemId
+      })
+      
+      lastG6Data = g6Data
+      
+      // 先清空数据，避免节点重叠显示
+      graph.clear()
+      
+      // 禁用动画，加快初始渲染
+      graph.set('animate', false)
+      
+      // 再设置新数据并渲染
+      graph.data(g6Data)
+      graph.render()
+      
+      // 强制布局计算，确保节点位置正确
+      graph.layout()
+      graph.render()
+    }
   }
 
   // 初始化数据
-  async function initGraph() {
+  async function initGraphData() {
     setLoading(true)
     try {
       const data = await buildData()
-      console.log('Setting topology data:', { systems: data.systems.length, connections: data.connections.length })
+      console.log('Topology data:', data)
       setTopologyData(data)
+      
+      // 延迟一下再渲染图表，确保DOM已经更新
+      setTimeout(() => {
+        // 确保DOM元素已经准备好
+        if (graphRef.current) {
+          renderGraph(data, focusedSystemId)
+        } else {
+          // 如果DOM元素还没准备好，再延迟一下
+          setTimeout(() => {
+            renderGraph(data, focusedSystemId)
+          }, 50)
+        }
+        // 渲染完成后再设置loading为false
+        setLoading(false)
+      }, 150)
     } catch (err) {
       console.error(err)
       message.error(getErrorMessage(err))
-    } finally {
       setLoading(false)
     }
   }
@@ -514,7 +1230,7 @@ export default function Topology() {
   const handleSystemSearch = async (systemId) => {
     if (!systemId) {
       setFocusedSystemId(null)
-      initGraph()
+      initGraphData()
       return
     }
 
@@ -524,12 +1240,27 @@ export default function Topology() {
     try {
       const { rels, systems, apis, endpoints } = await fetchBaseData()
       const data = buildTopologyFromData(rels, systems, apis, endpoints, systemId)
-      console.log('Search result data:', { systems: data.systems.length, connections: data.connections.length })
+      console.log('Search result data:', data)
       setTopologyData(data)
+      
+      // 延迟一下再渲染图表，确保DOM已经更新
+      setTimeout(() => {
+        // 确保DOM元素已经准备好
+        if (graphRef.current) {
+          // 渲染图表，将焦点系统显示在中心
+          renderGraph(data, systemId)
+        } else {
+          // 如果DOM元素还没准备好，再延迟一下
+          setTimeout(() => {
+            renderGraph(data, systemId)
+          }, 50)
+        }
+        // 渲染完成后再设置loading为false
+        setLoading(false)
+      }, 150)
     } catch (err) {
       console.error(err)
       message.error(getErrorMessage(err))
-    } finally {
       setLoading(false)
     }
   }
@@ -538,229 +1269,29 @@ export default function Topology() {
   const handleClearSearch = () => {
     setSearchSystem('')
     setFocusedSystemId(null)
-    initGraph()
+    initGraphData()
   }
 
-  // 处理拖动开始
-  const handleDragStart = (e, type, id, x, y) => {
-    e.preventDefault()
-    const rect = svgRef.current.getBoundingClientRect()
-    setDragging({ type, id })
-    setDragOffset({
-      x: e.clientX - rect.left - x,
-      y: e.clientY - rect.top - y
-    })
+  // 处理窗口大小变化
+  const handleResize = () => {
+    if (graphInstance.current && graphRef.current) {
+      const width = graphRef.current.clientWidth
+      const height = graphRef.current.clientHeight
+      graphInstance.current.changeSize(width, height)
+    }
   }
 
-  // 处理拖动移动
-  const handleDragMove = (e) => {
-    if (!dragging) return
+  // 初始化
+  useEffect(() => {
+    initGraphData()
+    window.addEventListener('resize', handleResize)
     
-    e.preventDefault()
-    const rect = svgRef.current.getBoundingClientRect()
-    const newX = e.clientX - rect.left - dragOffset.x
-    const newY = e.clientY - rect.top - dragOffset.y
-
-    // 更新拖动元素的位置
-    setTopologyData(prev => {
-      const newSystems = prev.systems.map(system => {
-        if (dragging.type === 'system' && system.id === dragging.id) {
-          return { ...system, x: newX, y: newY }
-        }
-        return system
-      })
-      return { ...prev, systems: newSystems }
-    })
-  }
-
-  // 处理拖动结束
-  const handleDragEnd = () => {
-    setDragging(null)
-    setDragOffset({ x: 0, y: 0 })
-  }
-
-  // 处理画布平移开始
-  const handlePanStart = (e) => {
-    e.preventDefault()
-    setPanning(true)
-    setPanStart({ x: e.clientX, y: e.clientY })
-  }
-
-  // 处理画布平移中
-  const handlePanMove = (e) => {
-    if (!panning) return
-    
-    e.preventDefault()
-    const deltaX = e.clientX - panStart.x
-    const deltaY = e.clientY - panStart.y
-    
-    setPanOffset(prev => ({
-      x: prev.x + deltaX,
-      y: prev.y + deltaY
-    }))
-    
-    setPanStart({ x: e.clientX, y: e.clientY })
-  }
-
-  // 处理画布平移结束
-  const handlePanEnd = () => {
-    setPanning(false)
-  }
-
-  // 处理鼠标滚轮事件，实现放大和缩小
-  const handleWheel = (e) => {
-    e.preventDefault()
-    
-    // 计算缩放因子
-    const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
-    const newZoom = Math.max(0.1, Math.min(3, zoom * scaleFactor))
-    
-    // 计算鼠标在SVG中的位置
-    const rect = svgRef.current.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-    
-    // 计算新的缩放中心
-    setZoomCenter({ x: mouseX, y: mouseY })
-    
-    // 更新缩放级别
-    setZoom(newZoom)
-  }
-
-  // 获取元素的绝对位置
-  const getElementPosition = (id, type) => {
-    // 查找系统
-    for (const system of topologyData.systems) {
-      if (type === 'system' && system.id === id) {
-        return { x: system.x, y: system.y, width: system.width, height: system.height }
-      }
-
-      // 查找API
-      for (const api of system.apis) {
-        if (type === 'api' && api.id === id) {
-          return {
-            x: system.x + api.x,
-            y: system.y + api.y,
-            width: api.width,
-            height: api.height
-          }
-        }
-
-        // 查找端点
-        for (const endpoint of api.endpoints) {
-          if (type === 'endpoint' && endpoint.id === id) {
-            return {
-              x: system.x + api.x + endpoint.x,
-              y: system.y + api.y + endpoint.y,
-              width: endpoint.width,
-              height: endpoint.height
-            }
-          }
-        }
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      if (graphInstance.current) {
+        graphInstance.current.destroy()
       }
     }
-    return { x: 0, y: 0, width: 0, height: 0 }
-  }
-
-  // 计算元素边缘的点
-  const getEdgePoint = (element, targetX, targetY) => {
-    const elementCenterX = element.x + element.width / 2
-    const elementCenterY = element.y + element.height / 2
-    
-    // 计算从元素中心到目标点的角度
-    const angle = Math.atan2(targetY - elementCenterY, targetX - elementCenterX)
-    
-    // 计算元素边缘的点
-    let edgeX, edgeY
-    
-    // 确定元素的哪个边缘与目标点最近
-    const cosAngle = Math.cos(angle)
-    const sinAngle = Math.sin(angle)
-    
-    // 计算与元素边界的交点
-    const tX = (cosAngle > 0 ? element.width / 2 : -element.width / 2) / cosAngle
-    const tY = (sinAngle > 0 ? element.height / 2 : -element.height / 2) / sinAngle
-    
-    // 选择较小的t值，确保点在元素边界上
-    const t = Math.min(Math.abs(tX), Math.abs(tY))
-    
-    edgeX = elementCenterX + cosAngle * t
-    edgeY = elementCenterY + sinAngle * t
-    
-    return { x: edgeX, y: edgeY }
-  }
-
-  // 绘制连接线
-  const drawConnections = () => {
-    return topologyData.connections.map(connection => {
-      const sourcePos = getElementPosition(connection.source, connection.sourceType)
-      const targetPos = getElementPosition(connection.target, connection.targetType)
-
-      // 计算目标点（端点边缘）
-      const targetCenterX = targetPos.x + targetPos.width / 2
-      const targetCenterY = targetPos.y + targetPos.height / 2
-      const targetEdgePoint = getEdgePoint(targetPos, sourcePos.x + sourcePos.width / 2, sourcePos.y + sourcePos.height / 2)
-      const targetX = targetEdgePoint.x
-      const targetY = targetEdgePoint.y
-
-      // 计算源点（源元素的边缘）
-      const sourceEdgePoint = getEdgePoint(sourcePos, targetCenterX, targetCenterY)
-      const sourceX = sourceEdgePoint.x
-      const sourceY = sourceEdgePoint.y
-
-      // 确定线条颜色
-      let strokeColor = '#1890ff'
-      if (connection.callerType === 'API' && connection.calleeType === 'API') {
-        strokeColor = '#52c41a'
-      } else if (connection.callerType === 'SYSTEM' && connection.calleeType === 'API') {
-        strokeColor = '#fa8c16'
-      }
-
-      // 计算平滑曲线的控制点
-      const controlOffset = 50
-      const dx = targetX - sourceX
-      const dy = targetY - sourceY
-      const distance = Math.sqrt(dx * dx + dy * dy)
-      
-      // 基于距离和方向计算控制点
-      const control1X = sourceX + (dx > 0 ? controlOffset : -controlOffset)
-      const control1Y = sourceY
-      const control2X = targetX - (dx > 0 ? controlOffset : -controlOffset)
-      const control2Y = targetY
-
-      // 计算箭头角度（基于曲线切线方向）
-      // 使用曲线在目标点的切线方向作为箭头方向
-      const tangentDx = targetX - control2X
-      const tangentDy = targetY - control2Y
-      const arrowAngle = Math.atan2(tangentDy, tangentDx) * 180 / Math.PI
-
-      return (
-        <g key={connection.id}>
-          {/* 平滑曲线 */}
-          <path
-            d={`M ${sourceX} ${sourceY} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${targetX} ${targetY}`}
-            stroke={strokeColor}
-            strokeWidth="2"
-            fill="none"
-            strokeLinecap="round"
-          />
-          
-          {/* 箭头 - 流程图风格的简单指向 */}
-          <g transform={`translate(${targetX}, ${targetY}) rotate(${arrowAngle})`}>
-            <polygon
-              points="0,0 -8,-4 -8,4"
-              fill={strokeColor}
-              stroke="none"
-            />
-          </g>
-        </g>
-      )
-    })
-  }
-
-  // 初始化数据
-  useEffect(() => {
-    initGraph()
   }, [])
 
   return (
@@ -797,7 +1328,7 @@ export default function Topology() {
           
           <Button
             icon={<ReloadOutlined />}
-            onClick={initGraph}
+            onClick={initGraphData}
             loading={loading}
           >
             刷新
@@ -823,28 +1354,24 @@ export default function Topology() {
         </div>
         <Space wrap>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '30px', height: '2px', background: '#1890ff' }}></div>
+            <div style={{ width: '30px', height: '2px', background: '#1890ff', borderStyle: 'dashed' }}></div>
             <span style={{ fontSize: '11px', color: '#1890ff' }}>系统调用</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '30px', height: '2px', background: '#52c41a' }}></div>
-            <span style={{ fontSize: '11px', color: '#52c41a' }}>API调用</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '30px', height: '2px', background: '#fa8c16', borderStyle: 'dashed' }}></div>
-            <span style={{ fontSize: '11px', color: '#fa8c16' }}>系统→API</span>
+            <div style={{ width: '30px', height: '2px', background: '#d9d9d9' }}></div>
+            <span style={{ fontSize: '11px', color: '#666' }}>层级关系</span>
           </div>
         </Space>
       </div>
 
       <Card
-        style={{ height: 600 }}
+        style={{ height: 800 }}
         styles={{ body: { padding: 0, height: '100%' } }}
         extra={
           <Space>
             <Tag color="blue">🏢 系统: {topologyData.systems.length}</Tag>
-            <Tag color="green">⚡ API: {topologyData.systems.reduce((sum, s) => sum + s.apis.length, 0)}</Tag>
-            <Tag color="orange">🔌 端点: {topologyData.systems.reduce((sum, s) => sum + s.apis.reduce((aSum, a) => aSum + a.endpoints.length, 0), 0)}</Tag>
+            <Tag color="green">⚡ API: {topologyData.apis.length}</Tag>
+            <Tag color="orange">🔌 端点: {topologyData.endpoints.length}</Tag>
             <Tag color="purple">→ 连接: {topologyData.connections.length}</Tag>
           </Space>
         }
@@ -854,170 +1381,10 @@ export default function Topology() {
             <Spin size="large" />
           </div>
         ) : (
-          <svg
-            ref={svgRef}
-            width="100%"
-            height="100%"
-            style={{ overflow: 'hidden' }}
-            onWheel={handleWheel}
-          >
-            {/* 更大的背景区域，用于平移 */}
-            <g>
-              {/* 背景矩形，用于拖动 */}
-              <rect
-                width="2000"
-                height="2000"
-                fill="#fafafa"
-                onMouseDown={handlePanStart}
-                onMouseMove={handlePanMove}
-                onMouseUp={handlePanEnd}
-                onMouseLeave={handlePanEnd}
-                style={{ cursor: panning ? 'grabbing' : 'grab' }}
-              />
-              
-              {/* 可平移和缩放的内容组 */}
-              <g transform={`translate(${panOffset.x}, ${panOffset.y}) scale(${zoom})`}>
-                {/* 绘制系统 */}
-                {topologyData.systems.map(system => (
-                  <g key={system.id}>
-                    {/* 系统容器 - 简洁圆角矩形 */}
-                    <rect
-                      x={system.x}
-                      y={system.y}
-                      width={system.width}
-                      height={system.height}
-                      fill="rgba(24, 144, 255, 0.15)"
-                      stroke="#1890ff"
-                      strokeWidth="1.5"
-                      rx="6"
-                      onMouseDown={(e) => {
-                        e.stopPropagation()
-                        handleDragStart(e, 'system', system.id, system.x, system.y)
-                      }}
-                      onMouseMove={(e) => {
-                        e.stopPropagation()
-                        handleDragMove(e)
-                      }}
-                      onMouseUp={(e) => {
-                        e.stopPropagation()
-                        handleDragEnd()
-                      }}
-                      onMouseLeave={(e) => {
-                        e.stopPropagation()
-                        handleDragEnd()
-                      }}
-                    />
-                    
-                    {/* 系统标题 */}
-                    <text
-                      x={system.x + 15}
-                      y={system.y + 28}
-                      fontSize="12"
-                      fontWeight="bold"
-                      fill="#1890ff"
-                    >
-                      🏢 {system.name}
-                    </text>
-                    
-                    {/* 系统描述 */}
-                    {system.description && (
-                      <text
-                        x={system.x + 15}
-                        y={system.y + 45}
-                        fontSize="9"
-                        fill="#666"
-                      >
-                        {system.description.length > 25 ? system.description.substring(0, 25) + '...' : system.description}
-                      </text>
-                    )}
-                    
-                    {/* API数量 */}
-                    <text
-                      x={system.x + system.width - 15}
-                      y={system.y + 28}
-                      fontSize="10"
-                      fill="#666"
-                      textAnchor="end"
-                    >
-                      API: {system.apis.length}
-                    </text>
-
-                    {/* 绘制API */}
-                    {system.apis.map(api => (
-                      <g key={api.id}>
-                        {/* API容器 - 简洁矩形 */}
-                        <rect
-                          x={system.x + api.x}
-                          y={system.y + api.y}
-                          width={api.width}
-                          height={api.height}
-                          fill="rgba(82, 196, 26, 0.15)"
-                          stroke="#52c41a"
-                          strokeWidth="1"
-                          rx="4"
-                        />
-                        
-                        {/* API标题 */}
-                        <text
-                          x={system.x + api.x + 12}
-                          y={system.y + api.y + 20}
-                          fontSize="10"
-                          fontWeight="bold"
-                          fill="#52c41a"
-                        >
-                          ⚡ {api.name}
-                        </text>
-                        
-                        {/* 端点数量 */}
-                        <text
-                          x={system.x + api.x + api.width - 12}
-                          y={system.y + api.y + 20}
-                          fontSize="9"
-                          fill="#666"
-                          textAnchor="end"
-                        >
-                          端点: {api.endpoints.length}
-                        </text>
-
-                        {/* 绘制端点 */}
-                        {api.endpoints.map(endpoint => (
-                          <g key={endpoint.id}>
-                            {/* 端点容器 - 改为圆形 */}
-                            <circle
-                              cx={system.x + api.x + endpoint.x + endpoint.width / 2}
-                              cy={system.y + api.y + endpoint.y + endpoint.height / 2}
-                              r={endpoint.width / 2}
-                              fill="#f5f5f5"
-                              stroke="#d9d9d9"
-                              strokeWidth="1"
-                            />
-                            {/* SVG Title元素 - 鼠标悬停时显示路径 */}
-                            <title>{endpoint.path}</title>
-                            
-                            {/* HTTP方法 */}
-                            <text
-                              x={system.x + api.x + endpoint.x + endpoint.width / 2}
-                              y={system.y + api.y + endpoint.y + endpoint.height / 2 + 3}
-                              fontSize="9"
-                              fontWeight="bold"
-                              fill="#fa8c16"
-                              textAnchor="middle"
-                              dominantBaseline="middle"
-                            >
-                              {endpoint.method}
-                            </text>
-                          </g>
-                        ))}
-                      </g>
-                    ))}
-                  </g>
-                ))}
-                
-                {/* 绘制连接线 - 放在最后，确保在最上层 */}
-                {drawConnections()}
-              </g>
-            </g>
-          </svg>
+          <div
+            ref={graphRef}
+            style={{ width: '100%', height: '100%' }}
+          />
         )}
       </Card>
     </div>

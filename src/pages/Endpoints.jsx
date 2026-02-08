@@ -66,8 +66,8 @@ export default function Endpoints(){
   function filtered(){
     const q = (search||'').trim().toLowerCase()
     return endpoints.filter(e => {
-      const api = mapApi(e.apiId)
-      const systemName = api ? (api.systemName || '') : ''
+      const api = mapApi(e.api_id)
+      const systemName = api ? (api.system_name || '') : ''
       const apiName = api ? (api.name || '') : ''
       return !q || (e.path||'').toLowerCase().includes(q) || (apiName||'').toLowerCase().includes(q) || (systemName||'').toLowerCase().includes(q)
     })
@@ -78,17 +78,17 @@ export default function Endpoints(){
   async function onCreate(values){
     try{
       const payload = {
-        apiId: values.apiId,
+        api_id: values.api_id,
         path: values.path.trim(),
-        httpMethod: values.httpMethod,
+        http_method: values.http_method,
         description: values.description,
         status: values.status || 'DEVELOPING',
-        onlineDate: values.onlineDate,
-        devHost: values.devHost,
-        uatHost: values.uatHost,
-        prodHost: values.prodHost,
-        healthCheckPath: values.healthCheckPath,
-        healthCheckRule: values.healthCheckRule
+        online_date: values.online_date,
+        dev_host: values.dev_host,
+        uat_host: values.uat_host,
+        prod_host: values.prod_host,
+        health_check_path: values.health_check_path,
+        health_check_rule: values.health_check_rule
       }
       await API.post('/api/v1/endpoints', payload)
       message.success('Endpoint created')
@@ -98,25 +98,25 @@ export default function Endpoints(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onSystemChangeForCreate(systemId){
-    if(!systemId){ setCreateApis([]); form.setFieldsValue({ apiId: undefined }); return }
+  async function onSystemChangeForCreate(system_id){
+    if(!system_id){ setCreateApis([]); form.setFieldsValue({ api_id: undefined }); return }
     try{
-      const res = await API.get('/api/v1/apis/search', { params: { systemId } })
+      const res = await API.get('/api/v1/apis/search', { params: { system_id } })
       const list = res.data || []
       setCreateApis(list)
-      if(list.length) form.setFieldsValue({ apiId: list[0].id })
-      else form.setFieldsValue({ apiId: undefined })
+      if(list.length) form.setFieldsValue({ api_id: list[0].id })
+      else form.setFieldsValue({ api_id: undefined })
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onSystemChangeForEdit(systemId){
-    if(!systemId){ setEditApis([]); editForm.setFieldsValue({ apiId: undefined }); return }
+  async function onSystemChangeForEdit(system_id){
+    if(!system_id){ setEditApis([]); editForm.setFieldsValue({ api_id: undefined }); return }
     try{
-      const res = await API.get('/api/v1/apis/search', { params: { systemId } })
+      const res = await API.get('/api/v1/apis/search', { params: { system_id } })
       const list = res.data || []
       setEditApis(list)
-      if(list.length) editForm.setFieldsValue({ apiId: list[0].id })
-      else editForm.setFieldsValue({ apiId: undefined })
+      if(list.length) editForm.setFieldsValue({ api_id: list[0].id })
+      else editForm.setFieldsValue({ api_id: undefined })
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
@@ -124,29 +124,39 @@ export default function Endpoints(){
     setDetailVisible(false)
     setEditing(record)
     await loadSystems()
-    // try to derive systemId from cached apis first, otherwise fetch single api
-    let api = mapApi(record.apiId)
+    // try to derive system_id from cached apis first, otherwise fetch single api
+    let api = mapApi(record.api_id)
     if(!api){
-      try{ api = await API.getApiById(record.apiId) }catch(e){ api = null }
+      try{ api = await API.getApiById(record.api_id) }catch(e){ api = null }
     }
-    const systemId = api?.systemId
-    if(systemId){
+    const system_id = api?.system_id
+    if(system_id){
       // populate editApis for that system and then set fields
-      await onSystemChangeForEdit(systemId)
+      await onSystemChangeForEdit(system_id)
     }
+    // 处理online_date字段，将ISO格式的日期字符串转换为Date对象
+    let onlineDate = record.online_date
+    if (onlineDate && typeof onlineDate === 'string') {
+      try {
+        onlineDate = new Date(onlineDate)
+      } catch (e) {
+        onlineDate = null
+      }
+    }
+    
     editForm.setFieldsValue({
-      systemId: systemId, 
-      apiId: record.apiId, 
+      system_id: system_id, 
+      api_id: record.api_id, 
       path: record.path, 
-      httpMethod: record.httpMethod, 
+      http_method: record.http_method, 
       description: record.description,
       status: record.status || 'DEVELOPING',
-      onlineDate: record.onlineDate,
-      devHost: record.devHost,
-      uatHost: record.uatHost,
-      prodHost: record.prodHost,
-      healthCheckPath: record.healthCheckPath,
-      healthCheckRule: record.healthCheckRule
+      online_date: onlineDate,
+      dev_host: record.dev_host,
+      uat_host: record.uat_host,
+      prod_host: record.prod_host,
+      health_check_path: record.health_check_path,
+      health_check_rule: record.health_check_rule
     })
     setEditVisible(true)
   }
@@ -156,15 +166,15 @@ export default function Endpoints(){
       const values = await editForm.validateFields()
       const payload = {
         path: values.path.trim(),
-        httpMethod: values.httpMethod,
+        http_method: values.http_method,
         description: values.description,
         status: values.status,
-        onlineDate: values.onlineDate,
-        devHost: values.devHost,
-        uatHost: values.uatHost,
-        prodHost: values.prodHost,
-        healthCheckPath: values.healthCheckPath,
-        healthCheckRule: values.healthCheckRule
+        online_date: values.online_date,
+        dev_host: values.dev_host,
+        uat_host: values.uat_host,
+        prod_host: values.prod_host,
+        health_check_path: values.health_check_path,
+        health_check_rule: values.health_check_rule
       }
       await API.put(`/api/v1/endpoints/${editing.id}`, payload)
       message.success('Updated')
@@ -188,10 +198,10 @@ export default function Endpoints(){
       const endpoint = res.data || {}
       // lazy-load API and system names for display
       let api = null
-      try{ api = await API.getApiById(endpoint.apiId) }catch(e){ api = null }
+      try{ api = await API.getApiById(endpoint.api_id) }catch(e){ api = null }
       let system = null
-      try{ system = await API.getSystemById(api?.systemId || endpoint.systemId) }catch(e){ system = null }
-      setDetail({ ...endpoint, apiName: api?.name, apiSystemName: api?.systemName || system?.name, apiSystemId: api?.systemId || system?.id })
+      try{ system = await API.getSystemById(api?.system_id || endpoint.system_id) }catch(e){ system = null }
+      setDetail({ ...endpoint, apiName: api?.name, apiSystemName: api?.system_name || system?.name, apiSystemId: api?.system_id || system?.id })
       setDetailVisible(true)
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
@@ -202,7 +212,7 @@ export default function Endpoints(){
 
   // ensure we have API names for visible items (only fetch missing ones)
   useEffect(()=>{
-    const visibleApiIds = Array.from(new Set((items||[]).map(i=>i.apiId).filter(Boolean)))
+    const visibleApiIds = Array.from(new Set((items||[]).map(i=>i.api_id).filter(Boolean)))
     const missing = visibleApiIds.filter(id => !apiCache[id])
     if(missing.length===0) return
     let mounted = true
@@ -218,9 +228,9 @@ export default function Endpoints(){
   // createApis / editApis are populated when user selects a System (via API call)
 
   const columns = [
-    { title: 'System', dataIndex: 'apiId', key: 'system', render: v => (mapApi(v)?.systemName || mapApi(v)?.systemId || '-') , width: 200 },
-    { title: 'API', dataIndex: 'apiId', key: 'apiId', render: v => (mapApi(v)?.name || v), width: 240 },
-    { title: 'Method', dataIndex: 'httpMethod', key: 'httpMethod', width: 100 },
+    { title: 'System', dataIndex: 'api_id', key: 'system', render: v => (mapApi(v)?.system_name || mapApi(v)?.system_id || '-') , width: 200 },
+    { title: 'API', dataIndex: 'api_id', key: 'api_id', render: v => (mapApi(v)?.name || v), width: 240 },
+    { title: 'Method', dataIndex: 'http_method', key: 'http_method', width: 100 },
     { title: 'Endpoint', dataIndex: 'path', key: 'path', width: 320, render: v => v },
     { title: 'Status', dataIndex: 'status', key: 'status', width: 120, render: v => v ? v : '-' },
     { title: 'Description', dataIndex: 'description', key: 'description', width: 360, render: v => (
@@ -230,7 +240,7 @@ export default function Endpoints(){
         </Tooltip>
       ) : <span style={{ color:'#9ca3af' }}>-</span>
     ) },
-    { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
+    { title: 'Created', dataIndex: 'created_at', key: 'created_at', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 320, onCell: ()=>({ className:'col-actions' }), onHeaderCell: ()=>({ className:'col-actions' }), render: (_, record)=>(
         <Space>
           <Button type="primary" size="small" onClick={()=>showDetail(record)}>Details</Button>
@@ -268,15 +278,15 @@ export default function Endpoints(){
       </div>
 
       <Modal title="Create Endpoint" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={760}>
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ httpMethod: 'GET', status: 'DEVELOPING' }}>
+        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ http_method: 'GET', status: 'DEVELOPING' }}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="systemId" label="System" >
+              <Form.Item name="system_id" label="System" >
                 <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="(optional) filter apis by system" optionFilterProp="label" onChange={onSystemChangeForCreate} allowClear />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="apiId" label="API" rules={[{ required: true, message: 'API is required' }]}>
+              <Form.Item name="api_id" label="API" rules={[{ required: true, message: 'API is required' }]}>
                 <Select showSearch placeholder="Select API" optionFilterProp="label" filterOption={(input, option)=>option.label.toLowerCase().includes(input.toLowerCase())}>
                   {(createApis||[]).map(a=> <Option key={a.id} value={a.id} label={a.name}>{a.name}</Option>)}
                 </Select>
@@ -291,7 +301,7 @@ export default function Endpoints(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="httpMethod" label="HTTP Method" rules={[{ required: true, message: 'Method is required' }]}>
+              <Form.Item name="http_method" label="HTTP Method" rules={[{ required: true, message: 'Method is required' }]}>
                 <Select>
                   <Option value="GET">GET</Option>
                   <Option value="POST">POST</Option>
@@ -316,7 +326,7 @@ export default function Endpoints(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="onlineDate" label="Online Date">
+              <Form.Item name="online_date" label="Online Date">
                 <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
               </Form.Item>
             </Col>
@@ -324,21 +334,21 @@ export default function Endpoints(){
 
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="devHost" label="Dev Host">
+              <Form.Item name="dev_host" label="Dev Host">
                 <Input placeholder="Development host" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="uatHost" label="UAT Host">
+              <Form.Item name="uat_host" label="UAT Host">
                 <Input placeholder="Testing host" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="prodHost" label="Prod Host">
+              <Form.Item name="prod_host" label="Prod Host">
                 <Input placeholder="Production host" />
               </Form.Item>
             </Col>
@@ -346,13 +356,13 @@ export default function Endpoints(){
 
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="healthCheckPath" label="Health Check Path">
+              <Form.Item name="health_check_path" label="Health Check Path">
                 <Input placeholder="/health" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="healthCheckRule" label="Health Check Rule">
+          <Form.Item name="health_check_rule" label="Health Check Rule">
             <Input.TextArea rows={3} placeholder="Health check rule JSON" />
           </Form.Item>
 
@@ -370,15 +380,15 @@ export default function Endpoints(){
       </Modal>
 
       <Modal title="Edit Endpoint" open={editVisible} onCancel={()=>{ setEditVisible(false); setEditing(null) }} footer={null} width={760}>
-        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ httpMethod: 'GET' }}>
+        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ http_method: 'GET' }}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="systemId" label="System" >
+              <Form.Item name="system_id" label="System" >
                 <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="(optional) filter apis by system" optionFilterProp="label" onChange={onSystemChangeForEdit} allowClear />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="apiId" label="API" rules={[{ required: true, message: 'API is required' }]}>
+              <Form.Item name="api_id" label="API" rules={[{ required: true, message: 'API is required' }]}>
                 <Select showSearch placeholder="Select API" optionFilterProp="label" filterOption={(input, option)=>option.label.toLowerCase().includes(input.toLowerCase())}>
                   {(editApis||[]).map(a=> <Option key={a.id} value={a.id} label={a.name}>{a.name}</Option>)}
                 </Select>
@@ -393,7 +403,7 @@ export default function Endpoints(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="httpMethod" label="HTTP Method" rules={[{ required: true, message: 'Method is required' }]}>
+              <Form.Item name="http_method" label="HTTP Method" rules={[{ required: true, message: 'Method is required' }]}>
                 <Select>
                   <Option value="GET">GET</Option>
                   <Option value="POST">POST</Option>
@@ -418,7 +428,7 @@ export default function Endpoints(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="onlineDate" label="Online Date">
+              <Form.Item name="online_date" label="Online Date">
                 <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
               </Form.Item>
             </Col>
@@ -426,21 +436,21 @@ export default function Endpoints(){
 
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="devHost" label="Dev Host">
+              <Form.Item name="dev_host" label="Dev Host">
                 <Input placeholder="Development host" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="uatHost" label="UAT Host">
+              <Form.Item name="uat_host" label="UAT Host">
                 <Input placeholder="Testing host" />
               </Form.Item>
             </Col>
           </Row>
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="prodHost" label="Prod Host">
+              <Form.Item name="prod_host" label="Prod Host">
                 <Input placeholder="Production host" />
               </Form.Item>
             </Col>
@@ -448,13 +458,13 @@ export default function Endpoints(){
 
           <Row gutter={12}>
             <Col span={24}>
-              <Form.Item name="healthCheckPath" label="Health Check Path">
+              <Form.Item name="health_check_path" label="Health Check Path">
                 <Input placeholder="/health" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="healthCheckRule" label="Health Check Rule">
+          <Form.Item name="health_check_rule" label="Health Check Rule">
             <Input.TextArea rows={3} placeholder="Health check rule JSON" />
           </Form.Item>
 
@@ -478,19 +488,19 @@ export default function Endpoints(){
               <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Path">{detail.path}</Descriptions.Item>
-            <Descriptions.Item label="HTTP Method">{detail.httpMethod}</Descriptions.Item>
-            <Descriptions.Item label="API">{detail.apiName || mapApi(detail.apiId)?.name || detail.apiId}</Descriptions.Item>
-            <Descriptions.Item label="System">{detail.apiSystemName || mapApi(detail.apiId)?.systemName || '-'}</Descriptions.Item>
+            <Descriptions.Item label="HTTP Method">{detail.http_method}</Descriptions.Item>
+            <Descriptions.Item label="API">{detail.apiName || mapApi(detail.api_id)?.name || detail.api_id}</Descriptions.Item>
+            <Descriptions.Item label="System">{detail.apiSystemName || mapApi(detail.api_id)?.system_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="Status">{detail.status || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Online Date">{detail.onlineDate ? new Date(detail.onlineDate).toLocaleString() : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Dev Host">{detail.devHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="UAT Host">{detail.uatHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Prod Host">{detail.prodHost || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Health Check Path">{detail.healthCheckPath || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Health Check Rule">{detail.healthCheckRule ? JSON.stringify(detail.healthCheckRule) : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Online Date">{detail.online_date ? new Date(detail.online_date).toLocaleString() : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Dev Host">{detail.dev_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="UAT Host">{detail.uat_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Prod Host">{detail.prod_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Path">{detail.health_check_path || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Rule">{detail.health_check_rule ? JSON.stringify(detail.health_check_rule) : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Created">{detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}</Descriptions.Item>
-            <Descriptions.Item label="Updated">{detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Created">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Updated">{detail.updated_at ? new Date(detail.updated_at).toLocaleString() : '-'}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

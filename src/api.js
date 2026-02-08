@@ -20,33 +20,28 @@ API.interceptors.request.use(
   }
 )
 
-// 将下划线分隔的字段名转换为驼峰命名
-function snakeToCamel(obj) {
-  if (Array.isArray(obj)) {
-    return obj.map(item => snakeToCamel(item))
-  } else if (obj && typeof obj === 'object') {
-    const converted = {}
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
-        converted[camelKey] = snakeToCamel(obj[key])
-      }
-    }
-    return converted
-  }
-  return obj
-}
-
 API.interceptors.response.use(
   res => {
-    // 转换响应数据中的字段名为驼峰命名
-    if (res.data) {
-      res.data = snakeToCamel(res.data)
-    }
+    // 保持原始的字段名格式，不进行转换
     return res
   },
   err => {
     if (err.response) {
+      // 处理401未授权错误
+      if (err.response.status === 401) {
+        // 清除本地存储的token
+        localStorage.removeItem('token')
+        // 显示登录过期提示
+        if (typeof window !== 'undefined') {
+          // 直接显示alert提示，避免require导致的问题
+          alert('登录已过期，请重新登录')
+          // 跳转到登录页面
+          window.location.href = '/login'
+          // 终止Promise链，防止后续错误处理覆盖跳转
+          return new Promise(() => {})
+        }
+      }
+      
       const e = new Error(err.response.statusText || 'API Error')
       e.status = err.response.status
       e.body = err.response.data

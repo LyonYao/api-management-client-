@@ -11,7 +11,7 @@ export default function HealthCheck(){
   async function batchCheck(){
     try{
       const ids = endpointIds.split(',').map(s=>s.trim()).filter(Boolean)
-      const res = await API.post('/api/v1/health-check/batch', { endpointIds: ids })
+      const res = await API.post('/api/v1/health-check/batch', { endpoint_ids: ids })
       setResult(res.data)
       message.success('Batch check completed')
     }catch(e){ console.error(e); message.error(getErrorMessage(e)) }

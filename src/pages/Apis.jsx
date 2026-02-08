@@ -67,15 +67,15 @@ export default function Apis(){
   async function onCreate(values){
     try{
       const payload = {
-        systemId: values.systemId,
+        system_id: values.system_id,
         name: values.name.trim(),
         description: values.description,
-        apiType: values.apiType || 'S',
-        authType: values.authType || 'NONE',
-        specLink: values.specLink,
+        api_type: values.api_type || 'S',
+        auth_type: values.auth_type || 'NONE',
+        spec_link: values.spec_link,
         department: values.department,
-        contactName: values.contactName,
-        contactEmails: (values.contactEmails || []).slice(0,10),
+        contact_name: values.contact_name,
+        contact_emails: (values.contact_emails || []).slice(0,10),
         tags: (values.tags || [])
       }
       await API.post('/api/v1/apis', payload)
@@ -90,40 +90,45 @@ export default function Apis(){
     setDetailVisible(false)
     setEditing(record)
     editForm.setFieldsValue({
-      systemId: record.systemId,
+      system_id: record.system_id,
       name: record.name,
       description: record.description,
-      apiType: record.apiType || 'S',
-      authType: record.authType || 'NONE',
-      specLink: record.specLink,
+      api_type: record.api_type || 'S',
+      auth_type: record.auth_type || 'NONE',
+      spec_link: record.spec_link,
       department: record.department,
-      contactName: record.contactName,
-      contactEmails: record.contactEmails || [],
+      contact_name: record.contact_name,
+      contact_emails: record.contact_emails || [],
       tags: record.tags || []
     })
     setEditVisible(true)
   }
 
-  async function onEdit(){
-    try{
+  async function onEdit() {
+    try {
       const values = await editForm.validateFields()
       const payload = {
+        system_id: values.system_id,
         name: values.name.trim(),
         description: values.description,
-        apiType: values.apiType,
-        authType: values.authType || 'NONE',
-        specLink: values.specLink,
+        api_type: values.api_type,
+        auth_type: values.auth_type || 'NONE',
+        spec_link: values.spec_link,
         department: values.department,
-        contactName: values.contactName,
-        contactEmails: (values.contactEmails || []).slice(0,10),
+        contact_name: values.contact_name,
+        contact_emails: (values.contact_emails || []).slice(0,10),
         tags: values.tags || []
       }
+      console.log('Updating API with payload:', payload)
       await API.put(`/api/v1/apis/${editing.id}`, payload)
       message.success('Updated')
       setEditVisible(false)
       setEditing(null)
       load()
-    }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
+    } catch (err) {
+      console.error(err)
+      message.error(getErrorMessage(err))
+    }
   }
 
   async function onDelete(id){
@@ -148,12 +153,12 @@ export default function Apis(){
 
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name', width: 240 },
-    { title: 'System', dataIndex: 'systemName', key: 'systemName', width: 180 },
-    { title: 'API Type', dataIndex: 'apiType', key: 'apiType', width: 120, render: v => v ? v : '-' },
+    { title: 'System', dataIndex: 'system_name', key: 'system_name', width: 180 },
+    { title: 'API Type', dataIndex: 'api_type', key: 'api_type', width: 120, render: v => v ? v : '-' },
     { title: 'Department', dataIndex: 'department', key: 'department', ellipsis: true },
-    { title: 'Contacts', dataIndex: 'contactEmails', key: 'contactEmails', width: 300, ellipsis: true, render: v => (v||[]).slice(0,3).map((e,i)=> <div key={i} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><a href={`mailto:${e}`}>{e}</a></div>) },
+    { title: 'Contacts', dataIndex: 'contact_emails', key: 'contact_emails', width: 300, ellipsis: true, render: v => (v||[]).slice(0,3).map((e,i)=> <div key={i} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><a href={`mailto:${e}`}>{e}</a></div>) },
     { title: 'Tags', dataIndex: 'tags', key: 'tags', width: 200, render: v => (v||[]).map(t=> <span key={t} style={{ marginRight:6, display: 'inline-block' }}><Tag>{t}</Tag></span>) },
-    { title: 'Created', dataIndex: 'createdAt', key: 'createdAt', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
+    { title: 'Created', dataIndex: 'created_at', key: 'created_at', width: 160, render: v => v ? new Date(v).toLocaleString() : '-' },
     { title: 'Actions', key: 'actions', width: 360,
       onCell: () => ({ className: 'col-actions' }),
       onHeaderCell: () => ({ className: 'col-actions' }),
@@ -202,10 +207,10 @@ export default function Apis(){
       </div>
 
       <Modal title="Create API" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={760}>
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ authType: 'NONE', apiType: 'S' }}>
+        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ auth_type: 'NONE', api_type: 'S' }}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="systemId" label="System" rules={[{ required: true, message: 'System is required' }]}>
+              <Form.Item name="system_id" label="System" rules={[{ required: true, message: 'System is required' }]}>
                 <Select showSearch options={systems} placeholder="Search system by name" optionFilterProp="label" filterOption={(input, option)=>option.label.toLowerCase().includes(input.toLowerCase())} allowClear />
               </Form.Item>
             </Col>
@@ -218,7 +223,7 @@ export default function Apis(){
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="apiType" label="API Type">
+              <Form.Item name="api_type" label="API Type">
                 <Select>
                   <Option value="P">P</Option>
                   <Option value="S">S</Option>
@@ -227,7 +232,7 @@ export default function Apis(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="authType" label="Auth Type">
+              <Form.Item name="auth_type" label="Auth Type">
                 <Select>
                   <Option value="NONE">NONE</Option>
                   <Option value="API_KEY">API_KEY</Option>
@@ -246,13 +251,13 @@ export default function Apis(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="contactEmails" label="Contact Emails" help="Up to 10 emails (comma separated)" rules={[{ validator: emailValidator }]}>
+              <Form.Item name="contact_emails" label="Contact Emails" help="Up to 10 emails (comma separated)" rules={[{ validator: emailValidator }]}>
                 <Select mode="tags" tokenSeparators={[',']} placeholder="a@x.com, b@x.com" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="specLink" label="Spec Link">
+          <Form.Item name="spec_link" label="Spec Link">
             <Input.TextArea rows={1} style={{ resize: 'none' }} />
           </Form.Item>
 
@@ -274,10 +279,10 @@ export default function Apis(){
       </Modal>
 
       <Modal title="Edit API" open={editVisible} onCancel={()=>{ setEditVisible(false); setEditing(null) }} footer={null} width={760}>
-        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ authType: 'NONE', apiType: 'S' }}>
+        <Form form={editForm} layout="vertical" onFinish={onEdit} initialValues={{ auth_type: 'NONE', api_type: 'S' }}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="systemId" label="System" rules={[{ required: true, message: 'System is required' }]}>
+              <Form.Item name="system_id" label="System" rules={[{ required: true, message: 'System is required' }]}>
                 <Select showSearch options={systems} placeholder="Search system by name" optionFilterProp="label" filterOption={(input, option)=>option.label.toLowerCase().includes(input.toLowerCase())} allowClear />
               </Form.Item>
             </Col>
@@ -290,7 +295,7 @@ export default function Apis(){
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="apiType" label="API Type">
+              <Form.Item name="api_type" label="API Type">
                 <Select>
                   <Option value="P">P</Option>
                   <Option value="S">S</Option>
@@ -299,7 +304,7 @@ export default function Apis(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="authType" label="Auth Type">
+              <Form.Item name="auth_type" label="Auth Type">
                 <Select>
                   <Option value="NONE">NONE</Option>
                   <Option value="API_KEY">API_KEY</Option>
@@ -318,7 +323,7 @@ export default function Apis(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="contactName" label="Contact Name">
+              <Form.Item name="contact_name" label="Contact Name">
                 <Input.TextArea rows={1} style={{ resize: 'none' }} />
               </Form.Item>
             </Col>
@@ -326,13 +331,13 @@ export default function Apis(){
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="contactEmails" label="Contact Emails" help="Up to 10 emails (comma separated)" rules={[{ validator: emailValidator }]}>
+              <Form.Item name="contact_emails" label="Contact Emails" help="Up to 10 emails (comma separated)" rules={[{ validator: emailValidator }]}>
                 <Select mode="tags" tokenSeparators={[',']} placeholder="a@x.com, b@x.com" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="specLink" label="Spec Link">
+          <Form.Item name="spec_link" label="Spec Link">
             <Input.TextArea rows={1} style={{ resize: 'none' }} />
           </Form.Item>
 
@@ -360,17 +365,17 @@ export default function Apis(){
               <code style={{ background:'#f5f7fa', padding:'4px 8px', borderRadius:6 }}>{detail.id}</code>
             </Descriptions.Item>
             <Descriptions.Item label="Name">{detail.name}</Descriptions.Item>
-            <Descriptions.Item label="System">{detail.systemName || detail.systemId}</Descriptions.Item>
-            <Descriptions.Item label="API Type">{detail.apiType || '-'}</Descriptions.Item>
+            <Descriptions.Item label="System">{detail.system_name || detail.system_id}</Descriptions.Item>
+            <Descriptions.Item label="API Type">{detail.api_type || '-'}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Auth Type">{detail.authType || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Spec Link">{detail.specLink ? <a href={detail.specLink} target="_blank" rel="noreferrer">Spec</a> : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Auth Type">{detail.auth_type || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Spec Link">{detail.spec_link ? <a href={detail.spec_link} target="_blank" rel="noreferrer">Spec</a> : '-'}</Descriptions.Item>
             <Descriptions.Item label="Department">{detail.department || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Contact Name">{detail.contactName || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Contact Emails">{(detail.contactEmails||[]).map(e=> <div key={e}><a href={`mailto:${e}`}>{e}</a></div>)}</Descriptions.Item>
+            <Descriptions.Item label="Contact Name">{detail.contact_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Contact Emails">{(detail.contact_emails||[]).map(e=> <div key={e}><a href={`mailto:${e}`}>{e}</a></div>)}</Descriptions.Item>
             <Descriptions.Item label="Tags">{(detail.tags||[]).map(t=> <span key={t} style={{ marginRight:6 }}><Tag>{t}</Tag></span>)}</Descriptions.Item>
-            <Descriptions.Item label="Created">{detail.createdAt ? new Date(detail.createdAt).toLocaleString() : '-'}</Descriptions.Item>
-            <Descriptions.Item label="Updated">{detail.updatedAt ? new Date(detail.updatedAt).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Created">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Updated">{detail.updated_at ? new Date(detail.updated_at).toLocaleString() : '-'}</Descriptions.Item>
           </Descriptions>
         )}
       </Modal>

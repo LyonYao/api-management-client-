@@ -17,8 +17,8 @@ export default function Login() {
         password: values.password
       })
       
-      if (res.data && res.data.accessToken) {
-        localStorage.setItem('token', res.data.accessToken)
+      if (res.data && res.data.access_token) {
+        localStorage.setItem('token', res.data.access_token)
         message.success('Login successful')
         // 使用replace确保用户不能返回登录页面
         navigate('/systems', { replace: true })

@@ -64,13 +64,13 @@ export default function Relationships(){
   async function onCreate(values){
     try{
       const payload = {
-        callerType: values.callerType,
-        callerId: values.callerType === 'SYSTEM' ? values.callerSystemId : values.callerApiId,
-        calleeType: values.calleeType,
-        calleeId: values.calleeType === 'SYSTEM' ? values.calleeSystemId : values.calleeApiId,
-        endpointId: values.endpointId,
-        authType: values.authType,
-        authConfig: values.authConfig ? JSON.parse(values.authConfig) : undefined,
+        caller_type: values.caller_type,
+        caller_id: values.caller_type === 'SYSTEM' ? values.caller_system_id : values.caller_api_id,
+        callee_type: values.callee_type,
+        callee_id: values.callee_type === 'SYSTEM' ? values.callee_system_id : values.callee_api_id,
+        endpoint_id: values.endpoint_id,
+        auth_type: values.auth_type,
+        auth_config: values.auth_config ? JSON.parse(values.auth_config) : undefined,
         description: values.description
       }
       await API.post('/api/v1/relationships', payload)
@@ -93,15 +93,15 @@ export default function Relationships(){
       // lazy-load related entities for clearer detail view
       let callerSystem = null, callerApi = null, calleeSystem = null, calleeApi = null, endpoint = null
       try{
-        if (r.callerType === 'SYSTEM') callerSystem = await API.getSystemById(r.callerId)
-        else callerApi = await API.getApiById(r.callerId)
+        if (r.caller_type === 'SYSTEM') callerSystem = await API.getSystemById(r.caller_id)
+        else callerApi = await API.getApiById(r.caller_id)
       }catch(e){ console.error('caller fetch', e) }
       try{
-        if (r.calleeType === 'SYSTEM') calleeSystem = await API.getSystemById(r.calleeId)
-        else calleeApi = await API.getApiById(r.calleeId)
+        if (r.callee_type === 'SYSTEM') calleeSystem = await API.getSystemById(r.callee_id)
+        else calleeApi = await API.getApiById(r.callee_id)
       }catch(e){ console.error('callee fetch', e) }
       try{
-        if (r.endpointId) endpoint = await API.getEndpointById(r.endpointId)
+        if (r.endpoint_id) endpoint = await API.getEndpointById(r.endpoint_id)
       }catch(e){ console.error('endpoint fetch', e) }
 
       setDetail({ ...r, callerSystem, callerApi, calleeSystem, calleeApi, endpoint })
@@ -109,46 +109,46 @@ export default function Relationships(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onCallerSystemChange(systemId){
-    if(!systemId){ setCallerApis([]); form.setFieldsValue({ callerApiId: undefined }); return }
+  async function onCallerSystemChange(system_id){
+    if(!system_id){ setCallerApis([]); form.setFieldsValue({ caller_api_id: undefined }); return }
     try{
-      const res = await API.get('/api/v1/apis/search', { params: { systemId } })
+      const res = await API.get('/api/v1/apis/search', { params: { system_id } })
       setCallerApis(res.data || [])
-      form.setFieldsValue({ callerApiId: undefined })
+      form.setFieldsValue({ caller_api_id: undefined })
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onCalleeSystemChange(systemId){
-    if(!systemId){ setCalleeApis([]); setCalleeEndpoints([]); form.setFieldsValue({ calleeApiId: undefined, endpointId: undefined }); return }
+  async function onCalleeSystemChange(system_id){
+    if(!system_id){ setCalleeApis([]); setCalleeEndpoints([]); form.setFieldsValue({ callee_api_id: undefined, endpoint_id: undefined }); return }
     try{
-      const res = await API.get('/api/v1/apis/search', { params: { systemId } })
+      const res = await API.get('/api/v1/apis/search', { params: { system_id } })
       setCalleeApis(res.data || [])
-      form.setFieldsValue({ calleeApiId: undefined, endpointId: undefined })
+      form.setFieldsValue({ callee_api_id: undefined, endpoint_id: undefined })
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onCalleeApiChange(apiId){
-    if(!apiId){ setCalleeEndpoints([]); form.setFieldsValue({ endpointId: undefined }); return }
+  async function onCalleeApiChange(api_id){
+    if(!api_id){ setCalleeEndpoints([]); form.setFieldsValue({ endpoint_id: undefined }); return }
     try{
-      const res = await API.get(`/api/v1/endpoints/api/${encodeURIComponent(apiId)}`)
+      const res = await API.get(`/api/v1/endpoints/api/${encodeURIComponent(api_id)}`)
       setCalleeEndpoints(res.data || [])
-      form.setFieldsValue({ endpointId: undefined })
+      form.setFieldsValue({ endpoint_id: undefined })
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
   const columns = [
     { title: 'Caller', key: 'caller', render: (_, r) => (
-      r.callerType === 'SYSTEM'
-        ? (mapSystem(r.callerId)?.name || r.callerId)
-        : (`${mapApi(r.callerId)?.systemName || '-'} / ${mapApi(r.callerId)?.name || r.callerId}`)
+      r.caller_type === 'SYSTEM'
+        ? (mapSystem(r.caller_id)?.name || r.caller_id)
+        : (`${mapApi(r.caller_id)?.system_name || '-'} / ${mapApi(r.caller_id)?.name || r.caller_id}`)
     )},
     { title: 'Callee', key: 'callee', render: (_, r) => (
-      r.calleeType === 'SYSTEM'
-        ? (mapSystem(r.calleeId)?.name || r.calleeId)
-        : (`${mapApi(r.calleeId)?.systemName || '-'} / ${mapApi(r.calleeId)?.name || r.calleeId}`)
+      r.callee_type === 'SYSTEM'
+        ? (mapSystem(r.callee_id)?.name || r.callee_id)
+        : (`${mapApi(r.callee_id)?.system_name || '-'} / ${mapApi(r.callee_id)?.name || r.callee_id}`)
     )},
-    { title: 'Endpoint', dataIndex: 'endpointId', key: 'endpointId', render: v => (endpointCache[v]?.path || v || '-') },
-    { title: 'Auth', dataIndex: 'authType', key: 'authType' },
+    { title: 'Endpoint', dataIndex: 'endpoint_id', key: 'endpoint_id', render: v => (endpointCache[v]?.path || v || '-') },
+    { title: 'Auth', dataIndex: 'auth_type', key: 'auth_type' },
     { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true },
     { title: 'Actions', key: 'actions', render: (_, record) => (
       <Space>
@@ -167,11 +167,11 @@ export default function Relationships(){
     const systemIds = new Set()
     const endpointIds = new Set()
     visible.forEach(r => {
-      if(r.callerType === 'API' && r.callerId) apiIds.add(r.callerId)
-      if(r.calleeType === 'API' && r.calleeId) apiIds.add(r.calleeId)
-      if(r.callerType === 'SYSTEM' && r.callerId) systemIds.add(r.callerId)
-      if(r.calleeType === 'SYSTEM' && r.calleeId) systemIds.add(r.calleeId)
-      if(r.endpointId) endpointIds.add(r.endpointId)
+      if(r.caller_type === 'API' && r.caller_id) apiIds.add(r.caller_id)
+      if(r.callee_type === 'API' && r.callee_id) apiIds.add(r.callee_id)
+      if(r.caller_type === 'SYSTEM' && r.caller_id) systemIds.add(r.caller_id)
+      if(r.callee_type === 'SYSTEM' && r.callee_id) systemIds.add(r.callee_id)
+      if(r.endpoint_id) endpointIds.add(r.endpoint_id)
     })
     const missingApi = Array.from(apiIds).filter(id => !apiCache[id])
     const missingSys = Array.from(systemIds).filter(id => !systemCache[id])
@@ -218,28 +218,28 @@ export default function Relationships(){
       </div>
 
       <Modal title="Create Relationship" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={800}>
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ callerType: 'SYSTEM', calleeType: 'API' }}>
+        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ caller_type: 'SYSTEM', callee_type: 'API' }}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="callerType" label="Caller Type">
-                <Select onChange={(v)=>{ form.setFieldsValue({ callerSystemId: undefined, callerApiId: undefined }); if(v==='SYSTEM'){} }}>
+              <Form.Item name="caller_type" label="Caller Type">
+                <Select onChange={(v)=>{ form.setFieldsValue({ caller_system_id: undefined, caller_api_id: undefined }); if(v==='SYSTEM'){} }}>
                   <Option value="SYSTEM">SYSTEM</Option>
                   <Option value="API">API</Option>
                 </Select>
               </Form.Item>
 
-              <Form.Item shouldUpdate={(prev, cur)=>prev.callerType!==cur.callerType} noStyle>
+              <Form.Item shouldUpdate={(prev, cur)=>prev.caller_type!==cur.caller_type} noStyle>
                 {()=> (
-                  form.getFieldValue('callerType') === 'SYSTEM' ? (
-                    <Form.Item name="callerSystemId" label="Caller System" rules={[{ required: true, message: 'System required' }]}>
+                  form.getFieldValue('caller_type') === 'SYSTEM' ? (
+                    <Form.Item name="caller_system_id" label="Caller System" rules={[{ required: true, message: 'System required' }]}>
                       <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="Select System" optionFilterProp="label" />
                     </Form.Item>
                   ) : (
                     <>
-                      <Form.Item name="callerSystemId" label="Caller System (filter)" >
+                      <Form.Item name="caller_system_id" label="Caller System (filter)" >
                         <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="(optional) filter apis" optionFilterProp="label" onChange={onCallerSystemChange} allowClear />
                       </Form.Item>
-                      <Form.Item name="callerApiId" label="Caller API" rules={[{ required: true, message: 'API required' }]}>
+                      <Form.Item name="caller_api_id" label="Caller API" rules={[{ required: true, message: 'API required' }]}>
                         <Select showSearch placeholder="Select API" optionFilterProp="label">
                           {(callerApis||[]).map(a=> <Option key={a.id} value={a.id} label={a.name}>{a.name}</Option>)}
                         </Select>
@@ -251,32 +251,32 @@ export default function Relationships(){
             </Col>
 
             <Col span={12}>
-              <Form.Item name="calleeType" label="Callee Type">
-                <Select onChange={(v)=>{ form.setFieldsValue({ calleeSystemId: undefined, calleeApiId: undefined, endpointId: undefined }); if(v==='SYSTEM'){} }}>
+              <Form.Item name="callee_type" label="Callee Type">
+                <Select onChange={(v)=>{ form.setFieldsValue({ callee_system_id: undefined, callee_api_id: undefined, endpoint_id: undefined }); if(v==='SYSTEM'){} }}>
                   <Option value="SYSTEM">SYSTEM</Option>
                   <Option value="API">API</Option>
                 </Select>
               </Form.Item>
 
-              <Form.Item shouldUpdate={(prev, cur)=>prev.calleeType!==cur.calleeType} noStyle>
+              <Form.Item shouldUpdate={(prev, cur)=>prev.callee_type!==cur.callee_type} noStyle>
                 {()=> (
-                  form.getFieldValue('calleeType') === 'SYSTEM' ? (
-                    <Form.Item name="calleeSystemId" label="Callee System" rules={[{ required: true, message: 'System required' }]}>
+                  form.getFieldValue('callee_type') === 'SYSTEM' ? (
+                    <Form.Item name="callee_system_id" label="Callee System" rules={[{ required: true, message: 'System required' }]}>
                       <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="Select System" optionFilterProp="label" />
                     </Form.Item>
                   ) : (
                     <>
-                      <Form.Item name="calleeSystemId" label="Callee System (filter)" >
+                      <Form.Item name="callee_system_id" label="Callee System (filter)" >
                         <Select showSearch options={(systems||[]).map(s=>({ label: s.name, value: s.id }))} placeholder="(optional) filter apis" optionFilterProp="label" onChange={onCalleeSystemChange} allowClear />
                       </Form.Item>
-                      <Form.Item name="calleeApiId" label="Callee API" rules={[{ required: true, message: 'API required' }]}>
+                      <Form.Item name="callee_api_id" label="Callee API" rules={[{ required: true, message: 'API required' }]}>
                         <Select showSearch placeholder="Select API" optionFilterProp="label" onChange={onCalleeApiChange}>
                           {(calleeApis||[]).map(a=> <Option key={a.id} value={a.id} label={a.name}>{a.name}</Option>)}
                         </Select>
                       </Form.Item>
-                      <Form.Item name="endpointId" label="Endpoint" rules={[{ required: true, message: 'Endpoint required' }]}>
+                      <Form.Item name="endpoint_id" label="Endpoint" rules={[{ required: true, message: 'Endpoint required' }]}>
                         <Select showSearch placeholder="Select endpoint" optionFilterProp="label">
-                          {(calleeEndpoints||[]).map(ep=> <Option key={ep.id} value={ep.id} label={`${ep.httpMethod} ${ep.path}`}>{`${ep.httpMethod} ${ep.path}`}</Option>)}
+                          {(calleeEndpoints||[]).map(ep=> <Option key={ep.id} value={ep.id} label={`${ep.http_method} ${ep.path}`}>{`${ep.http_method} ${ep.path}`}</Option>)}
                         </Select>
                       </Form.Item>
                     </>
@@ -288,7 +288,7 @@ export default function Relationships(){
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="authType" label="Auth Type">
+              <Form.Item name="auth_type" label="Auth Type">
                 <Select allowClear>
                   <Option value="API_KEY">API_KEY</Option>
                   <Option value="OAUTH2">OAUTH2</Option>
@@ -298,7 +298,7 @@ export default function Relationships(){
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="authConfig" label="Auth Config (JSON)">
+              <Form.Item name="auth_config" label="Auth Config (JSON)">
                 <Input.TextArea rows={2} placeholder='{"header":"Authorization","prefix":"Bearer"}' />
               </Form.Item>
             </Col>
@@ -322,29 +322,29 @@ export default function Relationships(){
           <Descriptions column={1} bordered size="small">
             <Descriptions.Item label="ID">{detail.id}</Descriptions.Item>
 
-            <Descriptions.Item label="Caller Type">{detail.callerType}</Descriptions.Item>
-            {detail.callerType === 'SYSTEM' ? (
-              <Descriptions.Item label="Caller System">{detail.callerSystem?.name || detail.callerId}</Descriptions.Item>
+            <Descriptions.Item label="Caller Type">{detail.caller_type}</Descriptions.Item>
+            {detail.caller_type === 'SYSTEM' ? (
+              <Descriptions.Item label="Caller System">{detail.callerSystem?.name || detail.caller_id}</Descriptions.Item>
             ) : (
               <>
-                <Descriptions.Item label="Caller System">{detail.callerApi?.systemName || detail.callerApi?.systemId || '-'}</Descriptions.Item>
-                <Descriptions.Item label="Caller API">{detail.callerApi?.name || detail.callerId}</Descriptions.Item>
+                <Descriptions.Item label="Caller System">{detail.callerApi?.system_name || detail.callerApi?.system_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="Caller API">{detail.callerApi?.name || detail.caller_id}</Descriptions.Item>
               </>
             )}
 
-            <Descriptions.Item label="Callee Type">{detail.calleeType}</Descriptions.Item>
-            {detail.calleeType === 'SYSTEM' ? (
-              <Descriptions.Item label="Callee System">{detail.calleeSystem?.name || detail.calleeId}</Descriptions.Item>
+            <Descriptions.Item label="Callee Type">{detail.callee_type}</Descriptions.Item>
+            {detail.callee_type === 'SYSTEM' ? (
+              <Descriptions.Item label="Callee System">{detail.calleeSystem?.name || detail.callee_id}</Descriptions.Item>
             ) : (
               <>
-                <Descriptions.Item label="Callee System">{detail.calleeApi?.systemName || detail.calleeApi?.systemId || '-'}</Descriptions.Item>
-                <Descriptions.Item label="Callee API">{detail.calleeApi?.name || detail.calleeId}</Descriptions.Item>
-                <Descriptions.Item label="Endpoint">{detail.endpoint ? `${detail.endpoint.httpMethod} ${detail.endpoint.path}` : (detail.endpointPath ? `${detail.endpointMethod || ''} ${detail.endpointPath}` : (detail.endpointId || '-'))}</Descriptions.Item>
+                <Descriptions.Item label="Callee System">{detail.calleeApi?.system_name || detail.calleeApi?.system_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="Callee API">{detail.calleeApi?.name || detail.callee_id}</Descriptions.Item>
+                <Descriptions.Item label="Endpoint">{detail.endpoint ? `${detail.endpoint.http_method} ${detail.endpoint.path}` : (detail.endpoint_path ? `${detail.endpoint_method || ''} ${detail.endpoint_path}` : (detail.endpoint_id || '-'))}</Descriptions.Item>
               </>
             )}
 
-            <Descriptions.Item label="Auth Type">{detail.authType || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Auth Config">{detail.authConfig ? (<pre style={{ margin:0 }}>{JSON.stringify(detail.authConfig, null, 2)}</pre>) : '-'}</Descriptions.Item>
+            <Descriptions.Item label="Auth Type">{detail.auth_type || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Auth Config">{detail.auth_config ? (<pre style={{ margin:0 }}>{JSON.stringify(detail.auth_config, null, 2)}</pre>) : '-'}</Descriptions.Item>
             <Descriptions.Item label="Description">{detail.description || '-'}</Descriptions.Item>
           </Descriptions>
         )}
