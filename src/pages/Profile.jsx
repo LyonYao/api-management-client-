@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Descriptions, Button, Space, message, Form, Input, Avatar } from 'antd'
 import API, { getErrorMessage } from '../api'
-import { UserOutlined, EditOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
+import { clearAllCache } from '../utils/cache'
+import { UserOutlined, EditOutlined, SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons'
 
 export default function Profile() {
   const [user, setUser] = useState(null)
@@ -91,13 +92,25 @@ export default function Profile() {
               </Descriptions.Item>
             </Descriptions>
             <div style={{ marginTop: 24, textAlign: 'right' }}>
-              <Button 
-                type="primary" 
-                icon={<EditOutlined />}
-                onClick={() => setEditing(true)}
-              >
-                Edit Profile
-              </Button>
+              <Space>
+                <Button 
+                  danger 
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    clearAllCache()
+                    message.success('Client cache cleared successfully')
+                  }}
+                >
+                  Clear Client Cache
+                </Button>
+                <Button 
+                  type="primary" 
+                  icon={<EditOutlined />}
+                  onClick={() => setEditing(true)}
+                >
+                  Edit Profile
+                </Button>
+              </Space>
             </div>
           </>
         ) : (

@@ -39,13 +39,24 @@ export default function AuditLog() {
     setLoading(true)
     try {
       // 构建查询参数
-      const params = {}
+      const params = {
+        page: 1,
+        page_size: 10
+      }
       if (filters.operationType) params.operation_type = filters.operationType
       if (filters.resourceType) params.resource_type = filters.resourceType
       if (filters.username) params.username = filters.username
       if (filters.dateRange && filters.dateRange[0]) {
-        params.start_date = filters.dateRange[0].toISOString()
-        params.end_date = filters.dateRange[1] ? filters.dateRange[1].toISOString() : dayjs().toISOString()
+        try {
+          // 确保使用正确的 ISO 格式，并且处理时区问题
+          // 对于开始日期，使用东八区的 00:00:00
+          params.start_time = dayjs(filters.dateRange[0]).startOf('day').toISOString()
+          // 对于结束日期，使用东八区的 23:59:59
+          params.end_time = filters.dateRange[1] ? dayjs(filters.dateRange[1]).endOf('day').toISOString() : dayjs().endOf('day').toISOString()
+        } catch (error) {
+          console.error('Error processing date range:', error)
+          // 如果日期处理出错，不设置日期参数，避免整个请求失败
+        }
       }
 
       const res = await API.get('/api/v1/audit', { params })
@@ -234,6 +245,8 @@ export default function AuditLog() {
             value={filters.dateRange}
             onChange={(dates) => handleFilterChange('dateRange', dates)}
             placeholder={['Start Date', 'End Date']}
+            valueFormat='YYYY-MM-DD'
+            format='YYYY-MM-DD'
           />
           
           <Space>

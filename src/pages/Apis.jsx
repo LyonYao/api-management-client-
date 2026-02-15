@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Tag, Row, Col } from 'antd'
 import Button from '../components/Button'
 import API, { getErrorMessage } from '../api'
+import { cacheApis } from '../utils/cache'
 
 const { Option } = Select
 
@@ -32,13 +33,19 @@ export default function Apis(){
     }catch(err){ console.error(err) }
   }
 
-  async function load(){
-    setLoading(true)
-    try{
-      const res = await API.get('/api/v1/apis')
-      setApis(res.data || [])
-    }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
-    finally{ setLoading(false) }
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await API.get('/api/v1/apis');
+      const apisData = res.data || [];
+      setApis(apisData);
+      cacheApis(apisData);
+    } catch (err) {
+      console.error(err);
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(()=>{ load() }, [])
@@ -76,7 +83,12 @@ export default function Apis(){
         department: values.department,
         contact_name: values.contact_name,
         contact_emails: (values.contact_emails || []).slice(0,10),
-        tags: (values.tags || [])
+        tags: (values.tags || []),
+        dev_host: values.dev_host,
+        uat_host: values.uat_host,
+        prod_host: values.prod_host,
+        health_check_path: values.health_check_path,
+        health_check_rule: values.health_check_rule
       }
       await API.post('/api/v1/apis', payload)
       message.success('API created')
@@ -99,7 +111,12 @@ export default function Apis(){
       department: record.department,
       contact_name: record.contact_name,
       contact_emails: record.contact_emails || [],
-      tags: record.tags || []
+      tags: record.tags || [],
+      dev_host: record.dev_host,
+      uat_host: record.uat_host,
+      prod_host: record.prod_host,
+      health_check_path: record.health_check_path,
+      health_check_rule: record.health_check_rule
     })
     setEditVisible(true)
   }
@@ -117,7 +134,12 @@ export default function Apis(){
         department: values.department,
         contact_name: values.contact_name,
         contact_emails: (values.contact_emails || []).slice(0,10),
-        tags: values.tags || []
+        tags: values.tags || [],
+        dev_host: values.dev_host,
+        uat_host: values.uat_host,
+        prod_host: values.prod_host,
+        health_check_path: values.health_check_path,
+        health_check_rule: values.health_check_rule
       }
       console.log('Updating API with payload:', payload)
       await API.put(`/api/v1/apis/${editing.id}`, payload)
@@ -265,6 +287,37 @@ export default function Apis(){
             <Select mode="tags" tokenSeparators={[',']} placeholder="tag1,tag2" />
           </Form.Item>
 
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="dev_host" label="Dev Host">
+                <Input placeholder="Development environment host" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="uat_host" label="UAT Host">
+                <Input placeholder="Testing environment host" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="prod_host" label="Prod Host">
+                <Input placeholder="Production environment host" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="health_check_path" label="Health Check Path">
+                <Input placeholder="Health check path (e.g., /health)" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="health_check_rule" label="Health Check Rule">
+                <Input.TextArea rows={2} placeholder="Health check rule (JSON format)" />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
           </Form.Item>
@@ -345,6 +398,37 @@ export default function Apis(){
             <Select mode="tags" tokenSeparators={[',']} placeholder="tag1,tag2" />
           </Form.Item>
 
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="dev_host" label="Dev Host">
+                <Input placeholder="Development environment host" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="uat_host" label="UAT Host">
+                <Input placeholder="Testing environment host" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="prod_host" label="Prod Host">
+                <Input placeholder="Production environment host" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="health_check_path" label="Health Check Path">
+                <Input placeholder="Health check path (e.g., /health)" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="health_check_rule" label="Health Check Rule">
+                <Input.TextArea rows={2} placeholder="Health check rule (JSON format)" />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
           </Form.Item>
@@ -374,6 +458,38 @@ export default function Apis(){
             <Descriptions.Item label="Contact Name">{detail.contact_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="Contact Emails">{(detail.contact_emails||[]).map(e=> <div key={e}><a href={`mailto:${e}`}>{e}</a></div>)}</Descriptions.Item>
             <Descriptions.Item label="Tags">{(detail.tags||[]).map(t=> <span key={t} style={{ marginRight:6 }}><Tag>{t}</Tag></span>)}</Descriptions.Item>
+            <Descriptions.Item label="Dev Host">{detail.dev_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="UAT Host">{detail.uat_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Prod Host">{detail.prod_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Path">{detail.health_check_path || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+            <Descriptions.Item label="Health Check Rule">{detail.health_check_rule ? <pre style={{ margin:0, whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{(() => {
+              console.log('Health Check Rule type:', typeof detail.health_check_rule);
+              console.log('Health Check Rule value:', detail.health_check_rule);
+              
+              // 确保我们处理所有可能的情况
+              if (detail.health_check_rule === null || detail.health_check_rule === undefined) {
+                return '-';
+              }
+              
+              if (typeof detail.health_check_rule === 'string') {
+                try {
+                  // 尝试解析字符串为JSON
+                  const parsed = JSON.parse(detail.health_check_rule);
+                  return JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                  // 如果解析失败，直接显示字符串
+                  return detail.health_check_rule;
+                }
+              }
+              
+              if (typeof detail.health_check_rule === 'object') {
+                // 对于对象，直接使用JSON.stringify
+                return JSON.stringify(detail.health_check_rule, null, 2);
+              }
+              
+              // 其他类型，直接显示
+              return String(detail.health_check_rule);
+            })()}</pre> : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Created">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
             <Descriptions.Item label="Updated">{detail.updated_at ? new Date(detail.updated_at).toLocaleString() : '-'}</Descriptions.Item>
           </Descriptions>

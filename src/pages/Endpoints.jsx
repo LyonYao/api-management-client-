@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message, Select, Row, Col, Tooltip, DatePicker } from 'antd'
+import dayjs from 'dayjs'
 import Button from '../components/Button'
 import API, { getErrorMessage } from '../api'
 
@@ -84,7 +85,6 @@ export default function Endpoints(){
         description: values.description,
         status: values.status || 'DEVELOPING',
         online_date: values.online_date,
-        dev_host: values.dev_host,
         uat_host: values.uat_host,
         prod_host: values.prod_host,
         health_check_path: values.health_check_path,
@@ -109,56 +109,61 @@ export default function Endpoints(){
     }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
   }
 
-  async function onSystemChangeForEdit(system_id){
-    if(!system_id){ setEditApis([]); editForm.setFieldsValue({ api_id: undefined }); return }
-    try{
-      const res = await API.get('/api/v1/apis/search', { params: { system_id } })
-      const list = res.data || []
-      setEditApis(list)
-      if(list.length) editForm.setFieldsValue({ api_id: list[0].id })
-      else editForm.setFieldsValue({ api_id: undefined })
-    }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
+  async function onSystemChangeForEdit(system_id) {
+    if(!system_id) {
+      setEditApis([]);
+      editForm.setFieldsValue({ api_id: undefined });
+      return;
+    }
+    try {
+      const res = await API.get('/api/v1/apis/search', { params: { system_id } });
+      const list = res.data || [];
+      setEditApis(list);
+      // 不要自动设置 api_id 字段值，保留用户选择或之前设置的值
+    } catch(err) {
+      console.error(err);
+      message.error(getErrorMessage(err));
+    }
   }
 
-  async function openEdit(record){
-    setDetailVisible(false)
-    setEditing(record)
-    await loadSystems()
+  async function openEdit(record) {
+    setDetailVisible(false);
+    setEditing(record);
+    await loadSystems();
     // try to derive system_id from cached apis first, otherwise fetch single api
-    let api = mapApi(record.api_id)
-    if(!api){
-      try{ api = await API.getApiById(record.api_id) }catch(e){ api = null }
-    }
-    const system_id = api?.system_id
-    if(system_id){
-      // populate editApis for that system and then set fields
-      await onSystemChangeForEdit(system_id)
-    }
-    // 处理online_date字段，将ISO格式的日期字符串转换为Date对象
-    let onlineDate = record.online_date
-    if (onlineDate && typeof onlineDate === 'string') {
+    let api = mapApi(record.api_id);
+    if(!api) {
       try {
-        onlineDate = new Date(onlineDate)
-      } catch (e) {
-        onlineDate = null
+        api = await API.getApiById(record.api_id);
+      } catch(e) {
+        api = null;
       }
     }
-    
+    const system_id = api?.system_id;
+    // 先设置表单字段值，然后再调用 onSystemChangeForEdit
+    // 使用 dayjs 库将 ISO 格式的日期字符串转换为 dayjs 对象
+    let onlineDate = null;
+    if (record.online_date) {
+      try {
+        onlineDate = dayjs(record.online_date);
+      } catch (e) {
+        onlineDate = null;
+      }
+    }
     editForm.setFieldsValue({
-      system_id: system_id, 
-      api_id: record.api_id, 
-      path: record.path, 
-      http_method: record.http_method, 
+      system_id: system_id,
+      api_id: record.api_id,
+      path: record.path,
+      http_method: record.http_method,
       description: record.description,
       status: record.status || 'DEVELOPING',
-      online_date: onlineDate,
-      dev_host: record.dev_host,
-      uat_host: record.uat_host,
-      prod_host: record.prod_host,
-      health_check_path: record.health_check_path,
-      health_check_rule: record.health_check_rule
-    })
-    setEditVisible(true)
+      online_date: onlineDate
+    });
+    if(system_id) {
+      // populate editApis for that system
+      await onSystemChangeForEdit(system_id);
+    }
+    setEditVisible(true);
   }
 
   async function onEdit(){
@@ -169,12 +174,7 @@ export default function Endpoints(){
         http_method: values.http_method,
         description: values.description,
         status: values.status,
-        online_date: values.online_date,
-        dev_host: values.dev_host,
-        uat_host: values.uat_host,
-        prod_host: values.prod_host,
-        health_check_path: values.health_check_path,
-        health_check_rule: values.health_check_rule
+        online_date: values.online_date
       }
       await API.put(`/api/v1/endpoints/${editing.id}`, payload)
       message.success('Updated')
@@ -219,7 +219,12 @@ export default function Endpoints(){
     Promise.all(missing.map(id => API.getApiById(id).catch(()=>null))).then(results=>{
       if(!mounted) return
       const copy = { ...apiCache }
-      results.forEach(r=>{ if(r && r.id) copy[r.id] = r })
+      // 遍历所有请求的 API ID，无论成功失败都添加到缓存中
+      // 这样可以避免失败的请求被重复发送
+      missing.forEach((id, index) => {
+        const result = results[index];
+        copy[id] = result;
+      });
       setApiCache(copy)
     })
     return ()=>{ mounted = false }
@@ -332,39 +337,7 @@ export default function Endpoints(){
             </Col>
           </Row>
 
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="dev_host" label="Dev Host">
-                <Input placeholder="Development host" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="uat_host" label="UAT Host">
-                <Input placeholder="Testing host" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="prod_host" label="Prod Host">
-                <Input placeholder="Production host" />
-              </Form.Item>
-            </Col>
-          </Row>
 
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="health_check_path" label="Health Check Path">
-                <Input placeholder="/health" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="health_check_rule" label="Health Check Rule">
-            <Input.TextArea rows={3} placeholder="Health check rule JSON" />
-          </Form.Item>
 
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
@@ -434,39 +407,7 @@ export default function Endpoints(){
             </Col>
           </Row>
 
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="dev_host" label="Dev Host">
-                <Input placeholder="Development host" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="uat_host" label="UAT Host">
-                <Input placeholder="Testing host" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="prod_host" label="Prod Host">
-                <Input placeholder="Production host" />
-              </Form.Item>
-            </Col>
-          </Row>
 
-          <Row gutter={12}>
-            <Col span={24}>
-              <Form.Item name="health_check_path" label="Health Check Path">
-                <Input placeholder="/health" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="health_check_rule" label="Health Check Rule">
-            <Input.TextArea rows={3} placeholder="Health check rule JSON" />
-          </Form.Item>
 
           <Form.Item name="description" label="Description">
             <Input.TextArea rows={4} />
@@ -493,11 +434,7 @@ export default function Endpoints(){
             <Descriptions.Item label="System">{detail.apiSystemName || mapApi(detail.api_id)?.system_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="Status">{detail.status || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Online Date">{detail.online_date ? new Date(detail.online_date).toLocaleString() : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Dev Host">{detail.dev_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="UAT Host">{detail.uat_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Prod Host">{detail.prod_host || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Health Check Path">{detail.health_check_path || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
-            <Descriptions.Item label="Health Check Rule">{detail.health_check_rule ? JSON.stringify(detail.health_check_rule) : <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
+
             <Descriptions.Item label="Description">{detail.description || <span style={{ color:'#9ca3af' }}>-</span>}</Descriptions.Item>
             <Descriptions.Item label="Created">{detail.created_at ? new Date(detail.created_at).toLocaleString() : '-'}</Descriptions.Item>
             <Descriptions.Item label="Updated">{detail.updated_at ? new Date(detail.updated_at).toLocaleString() : '-'}</Descriptions.Item>

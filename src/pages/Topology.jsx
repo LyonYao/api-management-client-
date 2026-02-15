@@ -44,7 +44,7 @@ export default function Topology() {
   }
 
   // 构建拓扑数据
-  async function buildData() {
+  async function buildData(focusSystemId = focusedSystemId) {
     try {
       const { rels, systems, apis, endpoints } = await fetchBaseData()
 
@@ -53,7 +53,7 @@ export default function Topology() {
         return createTestData()
       }
 
-      return buildTopologyFromData(rels, systems, apis, endpoints, focusedSystemId)
+      return buildTopologyFromData(rels, systems, apis, endpoints, focusSystemId)
     } catch (err) {
       console.error('Error building data:', err)
       return createTestData()
@@ -629,6 +629,7 @@ export default function Topology() {
         container: graphRef.current,
         width: graphRef.current.clientWidth,
         height: graphRef.current.clientHeight,
+        renderer: 'webgl', // 开启 WebGL 渲染以提高性能
         modes: {
           default: ['drag-canvas', 'zoom-canvas', 'drag-node']
         },
@@ -650,13 +651,15 @@ export default function Topology() {
           type: 'force',
           center: [graphRef.current.clientWidth / 2, graphRef.current.clientHeight / 2],
           linkDistance: 80,
-          nodeStrength: -300, // 增加节点排斥力，使节点更快散开
+          nodeStrength: -400, // 增加节点排斥力，使节点更快散开
           edgeStrength: 0.3, // 增加边的拉力，使布局更快收敛
           preventOverlap: true,
           collisionRadius: 50,
-          animate: false,
+          animate: true, // 启用布局动画，使节点运动更加平滑
           damping: 0.9, // 增加阻尼，减少震荡
-          maxIterations: 80 // 减少最大迭代次数，加快布局计算
+          maxIterations: 100, // 适当增加最大迭代次数，确保布局更加稳定
+          animationDuration: 1000, // 动画持续时间（毫秒）
+          animationEasing: 'ease-in-out-quad' // 动画缓动函数
         }
       });
       
@@ -839,11 +842,36 @@ export default function Topology() {
           
           const canvas = graph.get('canvas');
           
+          // 获取鼠标坐标（使用G6事件对象中已经转换好的画布坐标）
+          const mouseX = e.canvasX || e.x;
+          const mouseY = e.canvasY || e.y;
+          
+          // 获取画布大小
+          const canvasWidth = graph.get('width');
+          const canvasHeight = graph.get('height');
+          
+          // 计算 tooltip 位置，显示在鼠标左下角
+          // 向左偏移210px（tooltip宽度），这样tooltip的右边缘会靠近鼠标
+          // 向下偏移10px，确保tooltip显示在鼠标下方
+          let tooltipX = mouseX - 210;
+          let tooltipY = mouseY + 10;
+          
+          // 边界检查，确保tooltip不会超出画布范围
+          if (tooltipX < 10) {
+            tooltipX = 10; // 左边距
+          }
+          if (tooltipY > canvasHeight - 100) {
+            tooltipY = mouseY - 100; // 向上显示，避免超出底部
+          }
+          if (tooltipY < 10) {
+            tooltipY = 10; // 上边距
+          }
+          
           // 创建 tooltip 容器
           tooltipCache.tooltip = canvas.addShape('rect', {
             attrs: {
-              x: e.x + 10,
-              y: e.y + 10,
+              x: tooltipX,
+              y: tooltipY,
               width: 200,
               height: 0,
               fill: 'rgba(0, 0, 0, 0.7)',
@@ -857,8 +885,8 @@ export default function Topology() {
           if (model.type === 'system') {
             tooltipCache.text1 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 25,
+                x: tooltipX + 10,
+                y: tooltipY + 20,
                 text: model.label,
                 fontSize: 12,
                 fontWeight: 'bold',
@@ -871,8 +899,8 @@ export default function Topology() {
             
             tooltipCache.text2 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 45,
+                x: tooltipX + 10,
+                y: tooltipY + 40,
                 text: `描述: ${model.description || '无'}`,
                 fontSize: 10,
                 fill: '#ccc',
@@ -884,8 +912,8 @@ export default function Topology() {
             
             tooltipCache.text3 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 65,
+                x: tooltipX + 10,
+                y: tooltipY + 60,
                 text: `连接数: ${model.connectionCount}`,
                 fontSize: 10,
                 fill: '#ccc',
@@ -895,9 +923,25 @@ export default function Topology() {
               capture: false
             });
             
+            // 添加系统代码（如果有）
+            if (model.system_code) {
+              tooltipCache.text4 = canvas.addShape('text', {
+                attrs: {
+                  x: tooltipX + 10,
+                  y: tooltipY + 80,
+                  text: `系统代码: ${model.system_code}`,
+                  fontSize: 10,
+                  fill: '#ccc',
+                  textAlign: 'left',
+                  opacity: 0
+                },
+                capture: false
+              });
+            }
+            
             // 展开 tooltip
             tooltipCache.tooltip.animate({
-              height: 60,
+              height: model.system_code ? 80 : 60,
               opacity: 1
             }, {
               duration: 200
@@ -916,15 +960,20 @@ export default function Topology() {
                   if (tooltipCache.text3) {
                     tooltipCache.text3.attr('opacity', 1);
                   }
-                  graph.paint();
+                  setTimeout(() => {
+                    if (tooltipCache.text4) {
+                      tooltipCache.text4.attr('opacity', 1);
+                    }
+                    graph.paint();
+                  }, 50);
                 }, 50);
               }, 50);
             }, 100);
           } else if (model.type === 'api') {
             tooltipCache.text1 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 25,
+                x: tooltipX + 10,
+                y: tooltipY + 20,
                 text: model.label,
                 fontSize: 12,
                 fontWeight: 'bold',
@@ -937,8 +986,8 @@ export default function Topology() {
             
             tooltipCache.text2 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 45,
+                x: tooltipX + 10,
+                y: tooltipY + 40,
                 text: `系统: ${model.system_name}`,
                 fontSize: 10,
                 fill: '#ccc',
@@ -971,8 +1020,8 @@ export default function Topology() {
           } else if (model.type === 'endpoint') {
             tooltipCache.text1 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 25,
+                x: tooltipX + 10,
+                y: tooltipY + 20,
                 text: model.path,
                 fontSize: 12,
                 fill: '#fff',
@@ -984,8 +1033,8 @@ export default function Topology() {
             
             tooltipCache.text2 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 45,
+                x: tooltipX + 10,
+                y: tooltipY + 40,
                 text: `${model.method} | ${model.api_name}`,
                 fontSize: 10,
                 fill: '#ccc',
@@ -997,8 +1046,8 @@ export default function Topology() {
             
             tooltipCache.text3 = canvas.addShape('text', {
               attrs: {
-                x: e.x + 20,
-                y: e.y + 65,
+                x: tooltipX + 10,
+                y: tooltipY + 60,
                 text: `系统: ${model.system_name}`,
                 fontSize: 10,
                 fill: '#ccc',
@@ -1062,49 +1111,58 @@ export default function Topology() {
         // 隐藏 tooltip
         if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
           // 淡出文本
-          if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
-            tooltipCache.text3.attr('opacity', 0);
+          if (tooltipCache.text4 && !tooltipCache.text4.destroyed) {
+            tooltipCache.text4.attr('opacity', 0);
           }
           setTimeout(() => {
-            if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
-              tooltipCache.text2.attr('opacity', 0);
+            if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
+              tooltipCache.text3.attr('opacity', 0);
             }
             setTimeout(() => {
-              if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
-                tooltipCache.text1.attr('opacity', 0);
+              if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
+                tooltipCache.text2.attr('opacity', 0);
               }
               setTimeout(() => {
-                // 收起 tooltip
-                if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
-                  tooltipCache.tooltip.animate({
-                    height: 0,
-                    opacity: 0
-                  }, {
-                    duration: 150,
-                    callback: () => {
-                      // 动画结束后移除元素
-                      if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
-                        tooltipCache.tooltip.remove();
-                      }
-                      if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
-                        tooltipCache.text1.remove();
-                      }
-                      if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
-                        tooltipCache.text2.remove();
-                      }
-                      if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
-                        tooltipCache.text3.remove();
-                      }
-                      tooltipCache = {
-                        tooltip: null,
-                        text1: null,
-                        text2: null,
-                        text3: null
-                      };
-                      graph.paint();
-                    }
-                  });
+                if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
+                  tooltipCache.text1.attr('opacity', 0);
                 }
+                setTimeout(() => {
+                  // 收起 tooltip
+                  if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
+                    tooltipCache.tooltip.animate({
+                      height: 0,
+                      opacity: 0
+                    }, {
+                      duration: 150,
+                      callback: () => {
+                        // 动画结束后移除元素
+                        if (tooltipCache.tooltip && !tooltipCache.tooltip.destroyed) {
+                          tooltipCache.tooltip.remove();
+                        }
+                        if (tooltipCache.text1 && !tooltipCache.text1.destroyed) {
+                          tooltipCache.text1.remove();
+                        }
+                        if (tooltipCache.text2 && !tooltipCache.text2.destroyed) {
+                          tooltipCache.text2.remove();
+                        }
+                        if (tooltipCache.text3 && !tooltipCache.text3.destroyed) {
+                          tooltipCache.text3.remove();
+                        }
+                        if (tooltipCache.text4 && !tooltipCache.text4.destroyed) {
+                          tooltipCache.text4.remove();
+                        }
+                        tooltipCache = {
+                          tooltip: null,
+                          text1: null,
+                          text2: null,
+                          text3: null,
+                          text4: null
+                        };
+                        graph.paint();
+                      }
+                    });
+                  }
+                }, 50);
               }, 50);
             }, 50);
           }, 50);
@@ -1114,7 +1172,8 @@ export default function Topology() {
             tooltip: null,
             text1: null,
             text2: null,
-            text3: null
+            text3: null,
+            text4: null
           };
         }
       });
@@ -1132,14 +1191,20 @@ export default function Topology() {
   let lastG6Data = null
   
   // 渲染图表
-  function renderGraph(data, focusSystemId = null) {
+  function renderGraph(data, focusSystemId = null, retryCount = 0) {
     // 确保 graphRef.current 存在
     if (!graphRef.current) {
-      console.warn('Graph container not ready, waiting for DOM to render');
+      // 限制重试次数，避免无限循环
+      if (retryCount > 10) {
+        console.error('Graph container not ready after multiple attempts, stopping retry');
+        return;
+      }
+      
+      console.warn(`Graph container not ready, waiting for DOM to render (attempt ${retryCount + 1}/10)`);
       // 延迟一下再试
       setTimeout(() => {
-        renderGraph(data, focusSystemId);
-      }, 50); // 减少延迟时间
+        renderGraph(data, focusSystemId, retryCount + 1);
+      }, 100); // 增加延迟时间，给DOM更多时间渲染
       return;
     }
     
@@ -1181,19 +1246,29 @@ export default function Topology() {
       
       lastG6Data = g6Data
       
-      // 先清空数据，避免节点重叠显示
-      graph.clear()
+      // 启用动画，使图表过渡更加平滑
+      graph.set('animate', true)
       
-      // 禁用动画，加快初始渲染
-      graph.set('animate', false)
-      
-      // 再设置新数据并渲染
+      // 设置新数据
       graph.data(g6Data)
+      
+      // 执行布局计算
+      graph.layout()
+      
+      // 渲染图表（只渲染一次）
       graph.render()
       
-      // 强制布局计算，确保节点位置正确
-      graph.layout()
-      graph.render()
+      // 当显示所有节点时，调整视图以确保所有节点都可见
+      if (!focusSystemId && g6Data.nodes.length > 0) {
+        setTimeout(() => {
+          // 使用图表的 fitView 方法自动调整视图，确保所有节点都可见
+          graph.fitView({
+            padding: 50, // 边距
+            animated: true // 启用动画，使视图调整更加平滑
+          });
+          // 不需要再次调用 render()，fitView 会自动触发渲染
+        }, 100); // 减少延迟时间，加快视图调整
+      }
     }
   }
 
@@ -1267,9 +1342,51 @@ export default function Topology() {
 
   // 清除搜索
   const handleClearSearch = () => {
+    console.log('=== 开始执行显示全部功能 ===')
+    console.log('当前 focusedSystemId:', focusedSystemId)
     setSearchSystem('')
     setFocusedSystemId(null)
-    initGraphData()
+    console.log('已设置 focusedSystemId 为 null')
+    // 直接调用 buildData 和 renderGraph，确保使用最新的 focusSystemId 值（null）
+    setLoading(true)
+    console.log('已设置 loading 为 true')
+    try {
+      console.log('开始调用 buildData(null) 获取所有数据')
+      buildData(null).then(data => {
+        console.log('=== buildData 返回的数据 ===')
+        console.log('系统数量:', data.systems.length)
+        console.log('API数量:', data.apis.length)
+        console.log('端点数量:', data.endpoints.length)
+        console.log('连接数量:', data.connections.length)
+        setTopologyData(data)
+        console.log('已更新 topologyData 状态')
+        
+        // 延迟一下再渲染图表，确保DOM已经更新
+        setTimeout(() => {
+          // 确保DOM元素已经准备好
+          if (graphRef.current) {
+            console.log('开始调用 renderGraph(data, null) 渲染所有数据')
+            renderGraph(data, null) // 直接传递 null，确保显示所有数据
+          } else {
+            // 如果DOM元素还没准备好，再延迟一下
+            setTimeout(() => {
+              console.log('DOM元素未准备好，延迟后调用 renderGraph(data, null)')
+              renderGraph(data, null) // 直接传递 null，确保显示所有数据
+            }, 50)
+          }
+          // 渲染完成后再设置loading为false
+          setLoading(false)
+          console.log('已设置 loading 为 false')
+          console.log('=== 显示全部功能执行完成 ===')
+        }, 150)
+      })
+    } catch (err) {
+      console.error('显示全部功能执行出错:', err)
+      message.error(getErrorMessage(err))
+      setLoading(false)
+      console.log('已设置 loading 为 false')
+      console.log('=== 显示全部功能执行失败 ===')
+    }
   }
 
   // 处理窗口大小变化
@@ -1297,7 +1414,9 @@ export default function Topology() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>系统调用关系拓扑图</h3>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>系统调用关系拓扑图</h3>
+        </div>
         <Space>
           <AutoComplete
             style={{ width: 250 }}

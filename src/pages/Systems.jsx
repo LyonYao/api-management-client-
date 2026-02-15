@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Table, Modal, Form, Input, Space, Popconfirm, Descriptions, message } from 'antd'
 import API, { getErrorMessage } from '../api'
 import Button from '../components/Button'
+import { cacheSystems } from '../utils/cache'
 
 export default function Systems(){
   const [systems, setSystems] = useState([])
@@ -27,13 +28,19 @@ export default function Systems(){
     setButtonLoading(prev => ({ ...prev, [key]: loading }))
   }
 
-  async function load(){
-    setLoading(true)
-    try{
-      const res = await API.get('/api/v1/systems')
-      setSystems(res.data || [])
-    }catch(err){ console.error(err); message.error(getErrorMessage(err)) }
-    finally{ setLoading(false) }
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await API.get('/api/v1/systems');
+      const systemsData = res.data || [];
+      setSystems(systemsData);
+      cacheSystems(systemsData);
+    } catch (err) {
+      console.error(err);
+      message.error(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(()=>{ load() }, [])
@@ -153,8 +160,8 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
-            <Input placeholder="12-character system code" />
+          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { min: 5, message: 'System Code must be at least 5 characters' }, { max: 12, message: 'System Code must be at most 12 characters' }]}>
+            <Input placeholder="5-12 character system code" />
           </Form.Item>
           <Form.Item name="description" label="Description">
             <Input />
@@ -173,8 +180,8 @@ export default function Systems(){
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { len: 12, message: 'System Code must be 12 characters' }]}>
-            <Input placeholder="12-character system code" />
+          <Form.Item name="system_code" label="System Code" rules={[{ required: true, message: 'System Code is required' }, { min: 5, message: 'System Code must be at least 5 characters' }, { max: 12, message: 'System Code must be at most 12 characters' }]}>
+            <Input placeholder="5-12 character system code" />
           </Form.Item>
           <Form.Item name="description" label="Description">
             <Input />

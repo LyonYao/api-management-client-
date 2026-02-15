@@ -23,6 +23,7 @@ export default function Relationships(){
 
   const [editing, setEditing] = useState(null)
   const [detail, setDetail] = useState(null)
+  const [search, setSearch] = useState('')
 
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
@@ -59,6 +60,36 @@ export default function Relationships(){
   function mapSystem(id){ return systemCache[id] || systems.find(s=>s.id===id) || null }
   function mapApi(id){
     return apiCache[id] || (apis||[]).find(a=>a.id===id) || callerApis.find(a=>a.id===id) || calleeApis.find(a=>a.id===id) || null
+  }
+
+  function filteredRelationships() {
+    if (!search.trim()) return relationships
+    const q = search.trim().toLowerCase()
+    return relationships.filter(r => {
+      // 搜索调用方
+      if (r.caller_type === 'SYSTEM') {
+        const system = mapSystem(r.caller_id)
+        if (system && system.name.toLowerCase().includes(q)) return true
+      } else {
+        const api = mapApi(r.caller_id)
+        if (api && (api.name.toLowerCase().includes(q) || (api.system_name && api.system_name.toLowerCase().includes(q)))) return true
+      }
+      // 搜索被调用方
+      if (r.callee_type === 'SYSTEM') {
+        const system = mapSystem(r.callee_id)
+        if (system && system.name.toLowerCase().includes(q)) return true
+      } else {
+        const api = mapApi(r.callee_id)
+        if (api && (api.name.toLowerCase().includes(q) || (api.system_name && api.system_name.toLowerCase().includes(q)))) return true
+        // 搜索端点
+        const endpoint = endpointCache[r.endpoint_id]
+        if (endpoint && (endpoint.path.toLowerCase().includes(q) || endpoint.http_method.toLowerCase().includes(q))) return true
+      }
+      // 搜索认证类型和描述
+      if (r.auth_type && r.auth_type.toLowerCase().includes(q)) return true
+      if (r.description && r.description.toLowerCase().includes(q)) return true
+      return false
+    })
   }
 
   async function onCreate(values){
@@ -207,14 +238,22 @@ export default function Relationships(){
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-        <h3>Relationship 管理</h3>
+        <div style={{ display:'flex', alignItems:'center' }}>
+          <h3 style={{ margin: 0, marginRight: 16 }}>Relationship 管理</h3>
+          <Input.Search
+            placeholder="搜索调用方、被调用方、端点或描述"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: 300 }}
+          />
+        </div>
         <Space>
           <Button type="primary" onClick={openCreate}>New Relationship</Button>
         </Space>
       </div>
 
       <div className="card">
-        <Table size="middle" columns={columns} dataSource={relationships} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} />
+        <Table size="middle" columns={columns} dataSource={filteredRelationships()} rowKey="id" loading={loading} pagination={{ pageSize: 20 }} />
       </div>
 
       <Modal title="Create Relationship" open={createVisible} onCancel={()=>setCreateVisible(false)} footer={null} width={800}>

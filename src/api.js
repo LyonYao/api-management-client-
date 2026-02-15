@@ -74,10 +74,16 @@ async function fetchAndCache(map, key, url) {
   const now = Date.now()
   const entry = map.get(key)
   if (entry && (now - entry.ts) < CACHE_TTL) return entry.data
-  const res = await API.get(url)
-  const data = res.data
-  map.set(key, { ts: now, data })
-  return data
+  try {
+    const res = await API.get(url)
+    const data = res.data
+    map.set(key, { ts: now, data })
+    return data
+  } catch (err) {
+    // 缓存失败的结果，避免重复调用
+    map.set(key, { ts: now, data: null, error: true })
+    return null
+  }
 }
 
 export async function getSystemById(id, force = false) {
@@ -86,7 +92,14 @@ export async function getSystemById(id, force = false) {
     const e = cache.systems.get(id)
     if (e && (Date.now() - e.ts) < CACHE_TTL) return e.data
   }
-  return fetchAndCache(cache.systems, id, `/api/v1/systems/${encodeURIComponent(id)}`)
+  try {
+    return await fetchAndCache(cache.systems, id, `/api/v1/systems/${encodeURIComponent(id)}`)
+  } catch (err) {
+    console.error('Error fetching System by ID:', err)
+    // 缓存失败的结果，避免重复调用
+    cache.systems.set(id, { ts: Date.now(), data: null, error: true })
+    return null
+  }
 }
 
 export async function getApiById(id, force = false) {
@@ -95,7 +108,14 @@ export async function getApiById(id, force = false) {
     const e = cache.apis.get(id)
     if (e && (Date.now() - e.ts) < CACHE_TTL) return e.data
   }
-  return fetchAndCache(cache.apis, id, `/api/v1/apis/${encodeURIComponent(id)}`)
+  try {
+    return await fetchAndCache(cache.apis, id, `/api/v1/apis/${encodeURIComponent(id)}`)
+  } catch (err) {
+    console.error('Error fetching API by ID:', err)
+    // 缓存失败的结果，避免重复调用
+    cache.apis.set(id, { ts: Date.now(), data: null, error: true })
+    return null
+  }
 }
 
 export async function getEndpointById(id, force = false) {
@@ -104,7 +124,14 @@ export async function getEndpointById(id, force = false) {
     const e = cache.endpoints.get(id)
     if (e && (Date.now() - e.ts) < CACHE_TTL) return e.data
   }
-  return fetchAndCache(cache.endpoints, id, `/api/v1/endpoints/${encodeURIComponent(id)}`)
+  try {
+    return await fetchAndCache(cache.endpoints, id, `/api/v1/endpoints/${encodeURIComponent(id)}`)
+  } catch (err) {
+    console.error('Error fetching Endpoint by ID:', err)
+    // 缓存失败的结果，避免重复调用
+    cache.endpoints.set(id, { ts: Date.now(), data: null, error: true })
+    return null
+  }
 }
 
 // attach helpers on default export for convenience
